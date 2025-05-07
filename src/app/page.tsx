@@ -5,27 +5,31 @@ import Image from 'next/image';
 import { ResumeUploadForm } from '@/components/resume-upload-form';
 import { AnalysisResultsDisplay } from '@/components/analysis-results-display';
 import { ScoreFeedbackDisplay } from '@/components/score-feedback-display';
+import { JobRecommendationsDisplay } from '@/components/job-recommendations-display';
 import { LoadingIndicator } from '@/components/loading-indicator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { analyzeResume, type AnalyzeResumeOutput } from '@/ai/flows/resume-analyzer';
 import { analyzeResumeAndScore, type AnalyzeResumeAndScoreOutput } from '@/ai/flows/resume-score';
+import { getJobRecommendations, type JobRecommenderOutput } from '@/ai/flows/job-recommender';
 import { fileToDataUri } from '@/lib/file-utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, FileText, Sparkles } from 'lucide-react';
+import { BarChart, FileText, Sparkles, Target } from 'lucide-react';
 
 export default function HomePage() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalyzeResumeOutput | null>(null);
   const [scoreResult, setScoreResult] = useState<AnalyzeResumeAndScoreOutput | null>(null);
+  const [jobRecommendations, setJobRecommendations] = useState<JobRecommenderOutput | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentStage, setCurrentStage] = useState<string>(""); // For detailed loading message
 
-  // Effect to clear results when file is removed (or changed, if we implement that)
+  // Effect to clear results when file is removed
   useEffect(() => {
     if (!uploadedFile) {
       setAnalysisResult(null);
       setScoreResult(null);
+      setJobRecommendations(null);
       setError(null);
     }
   }, [uploadedFile]);
@@ -35,6 +39,7 @@ export default function HomePage() {
     setError(null);
     setAnalysisResult(null);
     setScoreResult(null);
+    setJobRecommendations(null);
     setUploadedFile(file);
 
     try {
@@ -58,9 +63,25 @@ export default function HomePage() {
       const scoreData = await analyzeResumeAndScore({ resumeText: resumeTextForScoring });
       setScoreResult(scoreData);
 
+      if (scoreData.score >= 75) {
+        setCurrentStage("Fetching job recommendations...");
+        const jobRecs = await getJobRecommendations({
+          skills: analysis.skills,
+          experienceSummary: analysis.experience,
+          // Optionally, you could try to infer a target role or add a field for it
+        });
+        setJobRecommendations(jobRecs);
+      }
+
     } catch (err) {
-      console.error("Error during resume analysis:", err);
-      setError(err instanceof Error ? err.message : "An unknown error occurred during analysis.");
+      console.error("Error during resume processing:", err);
+      setError(err instanceof Error ? err.message : "An unknown error occurred.");
+      // Ensure specific error messages for different stages if possible
+      if (currentStage.includes("Parsing") || currentStage.includes("Scoring")) {
+        setError(`An error occurred during AI analysis: ${err instanceof Error ? err.message : "Unknown AI error."}`);
+      } else if (currentStage.includes("job recommendations")) {
+         setError(`An error occurred while fetching job recommendations: ${err instanceof Error ? err.message : "Unknown error."}`);
+      }
     } finally {
       setIsProcessing(false);
       setCurrentStage("");
@@ -78,7 +99,7 @@ export default function HomePage() {
             Resume<span className="text-accent">Ace</span>
           </h1>
           <p className="mt-3 text-xl text-muted-foreground max-w-2xl mx-auto">
-            Unlock your resume's potential. Get AI-powered analysis, scores, and insights in seconds.
+            Unlock your resume's potential. Get AI-powered analysis, scores, job recommendations, and insights in seconds.
           </p>
         </header>
 
@@ -95,7 +116,8 @@ export default function HomePage() {
                     <p>1. <span className="font-medium text-foreground">Upload</span> your resume (PDF or DOCX).</p>
                     <p>2. <span className="font-medium text-foreground">AI Analysis</span> extracts key information.</p>
                     <p>3. <span className="font-medium text-foreground">Scoring</span> evaluates its effectiveness.</p>
-                    <p>4. <span className="font-medium text-foreground">View</span> insights and feedback instantly.</p>
+                    <p>4. <span className="font-medium text-foreground">Recommendations</span> get job suggestions (if score ≥ 75).</p>
+                    <p>5. <span className="font-medium text-foreground">View</span> insights and feedback instantly.</p>
                 </CardContent>
             </Card>
           </div>
@@ -111,7 +133,7 @@ export default function HomePage() {
 
             {error && !isProcessing && (
               <Alert variant="destructive" className="shadow-md">
-                <AlertTitle className="font-semibold">Analysis Error</AlertTitle>
+                <AlertTitle className="font-semibold">Processing Error</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
@@ -127,7 +149,7 @@ export default function HomePage() {
                 <CardContent>
                   <p className="text-muted-foreground">
                     Upload your resume to get started. We'll parse its content, score its effectiveness,
-                    and provide actionable feedback to help you land your dream job.
+                    and provide actionable feedback. If your score is 75 or above, we'll also suggest relevant jobs!
                   </p>
                   <Image 
                     src="https://picsum.photos/600/300" 
@@ -140,18 +162,27 @@ export default function HomePage() {
                 </CardContent>
               </Card>
             )}
-
-            {analysisResult && scoreResult && !isProcessing && !error && (
-              <>
+            
+            <div className="space-y-8">
+              {scoreResult && !isProcessing && !error && (
                 <ScoreFeedbackDisplay scoreData={scoreResult} />
+              )}
+              {analysisResult && !isProcessing && !error && (
                 <AnalysisResultsDisplay analysis={analysisResult} />
-              </>
-            )}
+              )}
+              {jobRecommendations && !isProcessing && !error && (
+                <JobRecommendationsDisplay recommendations={jobRecommendations} />
+              )}
+            </div>
+
           </div>
         </div>
          <footer className="text-center mt-16 py-8 border-t border-border">
             <p className="text-sm text-muted-foreground">
                 &copy; {new Date().getFullYear()} ResumeAce. Powered by AI.
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+                Job recommendations are AI-generated suggestions and require verification on job platforms.
             </p>
         </footer>
       </div>
