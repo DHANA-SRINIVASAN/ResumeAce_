@@ -63,7 +63,7 @@ export default function HomePage() {
       const scoreData = await analyzeResumeAndScore({ resumeText: resumeTextForScoring });
       setScoreResult(scoreData);
 
-      if (scoreData.score >= 75) {
+      if (scoreData.score >= 50) {
         setCurrentStage("Fetching job recommendations...");
         const jobRecs = await getJobRecommendations({
           skills: analysis.skills,
@@ -116,7 +116,7 @@ export default function HomePage() {
                     <p>1. <span className="font-medium text-foreground">Upload</span> your resume (PDF or DOCX).</p>
                     <p>2. <span className="font-medium text-foreground">AI Analysis</span> extracts key information.</p>
                     <p>3. <span className="font-medium text-foreground">Scoring</span> evaluates its effectiveness.</p>
-                    <p>4. <span className="font-medium text-foreground">Recommendations</span> get job suggestions (if score ≥ 75).</p>
+                    <p>4. <span className="font-medium text-foreground">Recommendations</span> get job suggestions (if score ≥ 50).</p>
                     <p>5. <span className="font-medium text-foreground">View</span> insights and feedback instantly.</p>
                 </CardContent>
             </Card>
@@ -149,7 +149,7 @@ export default function HomePage() {
                 <CardContent>
                   <p className="text-muted-foreground">
                     Upload your resume to get started. We'll parse its content, score its effectiveness,
-                    and provide actionable feedback. If your score is 75 or above, we'll also suggest relevant jobs!
+                    and provide actionable feedback. If your score is 50 or above, we'll also suggest relevant jobs!
                   </p>
                   <Image 
                     src="https://picsum.photos/600/300" 
