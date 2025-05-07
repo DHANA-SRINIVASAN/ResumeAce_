@@ -19,7 +19,7 @@ const JobRecommenderInputSchema = z.object({
 export type JobRecommenderInput = z.infer<typeof JobRecommenderInputSchema>;
 
 const RecommendedJobSchema = z.object({
-  title: z.string().describe('The job title.'),
+  title: z.string().describe('The job title. This field is absolutely mandatory for every job.'),
   company: z.string().describe('The hiring company name.'),
   description: z.string().describe('A brief description of why this job is a good fit for the candidate based on their resume.'),
   relevanceScore: z.number().min(0).max(1).describe('A score from 0.0 to 1.0 indicating the relevance of this job to the resume.'),
@@ -47,12 +47,12 @@ const jobRecommenderPrompt = ai.definePrompt({
   input: {schema: JobRecommenderInputSchema},
   output: {schema: JobRecommenderOutputSchema},
   prompt: `You are an expert career advisor and job recommender. Based on the following resume details, suggest 3-5 job roles.
-For each role, provide:
-1.  A plausible job title.
-2.  A plausible company name (can be well-known or generic).
-3.  A brief description (1-2 sentences) explaining why this job is a good fit for the candidate, referencing their skills and experience.
-4.  A relevance score (a number between 0.0 and 1.0) indicating how relevant this job is to the provided resume details.
-5.  Suggested search URLs for finding similar jobs on LinkedIn, Naukri, Indeed, and Glassdoor. These URLs should be functional search queries. For example, for LinkedIn: 'https://www.linkedin.com/jobs/search/?keywords=TITLE%20COMPANY&location=REGION' or similar constructive search links.
+For each and every job role, you MUST provide:
+1.  A plausible job title (the 'title' field). This is a critical and mandatory field.
+2.  A plausible company name (the 'company' field).
+3.  A brief description (1-2 sentences) explaining why this job is a good fit for the candidate, referencing their skills and experience (the 'description' field).
+4.  A relevance score (a number between 0.0 and 1.0) indicating how relevant this job is to the provided resume details (the 'relevanceScore' field).
+5.  Suggested search URLs for finding similar jobs on LinkedIn, Naukri, Indeed, and Glassdoor (the 'suggestedSearchLinks' object with its respective string fields). These URLs should be functional search queries. For example, for LinkedIn: 'https://www.linkedin.com/jobs/search/?keywords=TITLE%20COMPANY&location=REGION' or similar constructive search links.
 
 Resume Details:
 Skills: {{#each skills}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}
@@ -60,7 +60,8 @@ Experience Summary: {{{experienceSummary}}}
 {{#if targetRole}}Target Role Preference: {{{targetRole}}}{{/if}}
 
 Generate recommendations that are diverse and cover different potential career paths if applicable.
-Ensure the output strictly adheres to the JSON schema.
+Ensure all required fields, especially 'title', 'company', 'description', 'relevanceScore', and 'suggestedSearchLinks', are present for *every* job object in the 'jobs' array.
+The output must strictly adhere to the JSON schema, paying close attention to required fields for each job object.
 `,
 });
 
@@ -75,3 +76,4 @@ const jobRecommenderFlow = ai.defineFlow(
     return output!;
   }
 );
+
