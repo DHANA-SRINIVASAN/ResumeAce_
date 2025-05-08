@@ -1,7 +1,7 @@
 // src/components/career-roadmap-display.tsx
 "use client";
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import type { AnalyzeResumeOutput } from '@/ai/flows/resume-analyzer';
 import { generateCareerRoadmap, type CareerRoadmapOutput, type RoadmapStep } from '@/ai/flows/career-roadmap-flow';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { DraftingCompass, TrendingUp, Lightbulb, Award, BadgeDollarSign, CheckSquare, ExternalLink, Clock3, Info, Brain, BookOpen, Download, CircleHelp, CircleCheck, CircleDotDashed } from 'lucide-react';
 import { Separator } from './ui/separator';
 import { Badge } from './ui/badge';
+import html2canvas from 'html2canvas';
 
 import ReactFlow, {
   Controls,
@@ -24,7 +25,7 @@ import ReactFlow, {
   Position,
   MarkerType,
   ReactFlowProvider,
-  useReactFlow,
+  // useReactFlow, // No longer needed for toPng
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -85,9 +86,10 @@ const CustomNode = ({ data }: { data: any }) => {
 const nodeTypes = { custom: CustomNode };
 
 const RoadmapFlow = ({ roadmap, analysisResult }: { roadmap: CareerRoadmapOutput, analysisResult: AnalyzeResumeOutput | null }) => {
-  const { getNodes, getEdges, toPng } = useReactFlow();
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const reactFlowWrapperRef = useRef<HTMLDivElement>(null);
+
 
   React.useEffect(() => {
     if (roadmap && roadmap.steps) {
@@ -108,7 +110,7 @@ const RoadmapFlow = ({ roadmap, analysisResult }: { roadmap: CareerRoadmapOutput
             resources: step.resources,
             coverageStatus: coverageStatus,
           },
-          position: { x: 0, y: index * 200 }, // Adjust Y for vertical layout
+          position: { x: 0, y: index * 200 }, 
         };
       });
 
@@ -131,20 +133,57 @@ const RoadmapFlow = ({ roadmap, analysisResult }: { roadmap: CareerRoadmapOutput
     [setEdges]
   );
   
-  const handleDownloadImage = useCallback(() => {
-    toPng().then((dataUrl) => {
-      const a = document.createElement("a");
-      a.href = dataUrl;
-      a.download = "career_roadmap.png";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    }).catch(err => console.error("Failed to download image", err));
-  }, [toPng]);
+  const handleDownloadImage = useCallback(async () => {
+    const viewportElement = reactFlowWrapperRef.current?.querySelector('.react-flow__viewport') as HTMLElement;
+
+    if (viewportElement && reactFlowWrapperRef.current) {
+        // Temporarily adjust wrapper for full capture if elements are outside viewport bounds
+        // This is a common issue with html2canvas if content overflows
+        const originalStyle = {
+            overflow: reactFlowWrapperRef.current.style.overflow,
+            height: reactFlowWrapperRef.current.style.height,
+            width: reactFlowWrapperRef.current.style.width,
+        };
+        // Ensure all content is visible for canvas capture
+        // reactFlowWrapperRef.current.style.overflow = 'visible';
+        // reactFlowWrapperRef.current.style.height = 'auto'; 
+        // reactFlowWrapperRef.current.style.width = 'auto';
+
+      try {
+        const canvas = await html2canvas(reactFlowWrapperRef.current, { // Capture the whole wrapper
+          useCORS: true,
+          logging: false,
+          // width: viewportElement.scrollWidth, // Try to get full content width
+          // height: viewportElement.scrollHeight, // Try to get full content height
+          // windowWidth: viewportElement.scrollWidth,
+          // windowHeight: viewportElement.scrollHeight,
+          scrollX: - viewportElement.scrollLeft, //Account for scroll
+          scrollY: - viewportElement.scrollTop,
+          
+        });
+        const dataUrl = canvas.toDataURL('image/png');
+        const a = document.createElement("a");
+        a.href = dataUrl;
+        a.download = "career_roadmap.png";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } catch (err) {
+        console.error("Failed to download image using html2canvas", err);
+      } finally {
+         // Restore original styles
+        // reactFlowWrapperRef.current.style.overflow = originalStyle.overflow;
+        // reactFlowWrapperRef.current.style.height = originalStyle.height;
+        // reactFlowWrapperRef.current.style.width = originalStyle.width;
+      }
+    } else {
+      console.error("React Flow wrapper or viewport element not found for image export.");
+    }
+  }, []);
 
 
   return (
-    <div style={{ height: '600px', width: '100%' }} className="mt-6 border rounded-lg shadow-inner bg-muted/20">
+    <div ref={reactFlowWrapperRef} style={{ height: '600px', width: '100%' }} className="mt-6 border rounded-lg shadow-inner bg-muted/20 overflow-hidden">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -159,7 +198,7 @@ const RoadmapFlow = ({ roadmap, analysisResult }: { roadmap: CareerRoadmapOutput
         <Controls className="[&_button]:bg-background [&_button]:border-border [&_button_path]:fill-foreground" />
         <Background color="hsl(var(--border))" gap={16} />
       </ReactFlow>
-      <div className="p-2 flex justify-end">
+      <div className="p-2 flex justify-end bg-background border-t">
         <Button onClick={handleDownloadImage} variant="outline" size="sm">
           <Download className="w-4 h-4 mr-2" />
           Download Roadmap (PNG)
@@ -309,3 +348,4 @@ export function CareerRoadmapDisplay({ analysisResult }: CareerRoadmapDisplayPro
     </Card>
   );
 }
+
