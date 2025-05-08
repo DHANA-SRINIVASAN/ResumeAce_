@@ -37,7 +37,7 @@ export type CareerRoadmapInput = z.infer<typeof CareerRoadmapInputSchema>;
 
 const RoadmapResourceSchema = z.object({
   name: z.string().describe("The name of the learning resource (e.g., 'MDN Web Docs', 'Egghead.io course'). This field is mandatory for each resource."),
-  url: z.string().url().optional().describe("An optional direct URL to the learning resource. If provided, it must be a valid and functional hyperlink. Example: 'https://developer.mozilla.org/en-US/docs/Web/HTML'"),
+  url: z.string().optional().describe("An optional direct URL to the learning resource. If provided, it must be a valid and functional hyperlink. Example: 'https://developer.mozilla.org/en-US/docs/Web/HTML'"),
 });
 export type RoadmapResource = z.infer<typeof RoadmapResourceSchema>;
 
@@ -46,7 +46,7 @@ const RoadmapNodeSchema = z.object({
   label: z.string().describe("The display name of the skill, concept, or tool (e.g., 'HTML', 'JavaScript Basics', 'CI/CD Pipelines')."),
   stage: z.enum(["Fundamentals", "Core Skills", "Advanced Topics", "Optional/Nice-to-Have"]).describe("The learning stage this node belongs to."),
   description: z.string().optional().describe("A brief description of what this node/skill entails, why it's important for the target role, and key learning objectives. This should be concise but informative."),
-  resources: z.array(RoadmapResourceSchema).default([]).describe("A list of 1-2 specific learning resource suggestions. Each resource object MUST contain a 'name' and can optionally include a 'url'."),
+  resources: z.array(RoadmapResourceSchema).default([]).describe("A list of 1-2 specific learning resource suggestions. Each resource object MUST contain a 'name' and can optionally include a 'url'. Ensure resources are relevant and URLs are plausible."),
 });
 export type RoadmapNode = z.infer<typeof RoadmapNodeSchema>;
 
@@ -113,6 +113,7 @@ Important:
 -   The number of nodes should be between 20 and 40. For very complex roles, lean towards the higher end. For simpler transitions, the lower end.
 -   Node descriptions and resource suggestions should be practical and concise. Resource URLs must be valid if provided.
 -   If referencing roadmap.sh structure, adapt it to fit this JSON format and personalize based on the resume.
+-   The nodes should be ordered in a logical sequence based on their stage. For example, all "Fundamentals" nodes should appear before "Core Skills" nodes in the "nodes" array.
 
 Example Node:
 {
