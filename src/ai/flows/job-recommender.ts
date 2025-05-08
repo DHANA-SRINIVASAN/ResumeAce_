@@ -10,6 +10,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z}from 'genkit';
+import type { GenerateResponse } from 'genkit/generate';
 
 const JobRecommenderInputSchema = z.object({
   skills: z.array(z.string()).describe('A list of skills from the resume.'),
@@ -18,7 +19,7 @@ const JobRecommenderInputSchema = z.object({
 });
 export type JobRecommenderInput = z.infer<typeof JobRecommenderInputSchema>;
 
-const RecommendedJobSchema = z.object({
+const RecommendedJobSchemaRequired = z.object({
   title: z.string().describe('The job title. This field is absolutely mandatory for every job recommendation.'),
   company: z.string().describe('The hiring company name. This field is mandatory.'),
   description: z.string().describe('A brief description of why this job is a good fit for the candidate based on their resume. This field is mandatory.'),
@@ -30,22 +31,26 @@ const RecommendedJobSchema = z.object({
     glassdoor: z.string().optional().describe("A suggested search URL for finding similar jobs on Glassdoor. Example: 'https://www.glassdoor.co.in/Job/software-engineer-jobs-SRCH_KO0,17.htm'")
   }).describe("Suggested search URLs for popular job platforms. This object is mandatory.")
 });
+// Make all fields in RecommendedJobSchema optional for initial parsing from LLM, then enforce in post-processing
+const RecommendedJobSchemaLax = RecommendedJobSchemaRequired.partial();
+
 
 const JobRecommenderOutputSchema = z.object({
-  jobs: z.array(RecommendedJobSchema).describe('A list of 3-5 recommended jobs.'),
+  jobs: z.array(RecommendedJobSchemaRequired).describe('A list of 3-5 recommended jobs.'),
 });
 export type JobRecommenderOutput = z.infer<typeof JobRecommenderOutputSchema>;
-export type RecommendedJob = z.infer<typeof RecommendedJobSchema>;
+export type RecommendedJob = z.infer<typeof RecommendedJobSchemaRequired>;
 
 
 export async function getJobRecommendations(input: JobRecommenderInput): Promise<JobRecommenderOutput> {
   return jobRecommenderFlow(input);
 }
 
+// Define the prompt with a potentially laxer output schema for LLM response, then validate/clean in flow
 const jobRecommenderPrompt = ai.definePrompt({
   name: 'jobRecommenderPrompt',
   input: {schema: JobRecommenderInputSchema},
-  output: {schema: JobRecommenderOutputSchema},
+  output: {schema: z.object({jobs: z.array(RecommendedJobSchemaLax)})}, // Use lax schema for LLM output
   prompt: `You are an expert career advisor and job recommender. Based on the following resume details, suggest 3-5 job roles.
 For each and every job role, you MUST provide:
 1.  A plausible job title (the 'title' field). This is an absolutely critical and mandatory field. Without a title, the recommendation is useless.
@@ -69,26 +74,61 @@ const jobRecommenderFlow = ai.defineFlow(
   {
     name: 'jobRecommenderFlow',
     inputSchema: JobRecommenderInputSchema,
-    outputSchema: JobRecommenderOutputSchema,
+    outputSchema: JobRecommenderOutputSchema, // Flow's final output must adhere to the strict schema
   },
-  async (input) => {
-    const {output} = await jobRecommenderPrompt(input);
-    // Ensure title and other mandatory fields are present for every job
-    if (output && output.jobs) {
-      output.jobs = output.jobs.map(job => ({
-        title: job.title || "Missing Title - Error in AI Generation",
-        company: job.company || "Missing Company",
-        description: job.description || "Missing Description",
-        relevanceScore: job.relevanceScore ?? 0,
-        suggestedSearchLinks: job.suggestedSearchLinks || {
-            linkedIn: `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(job.title || "job")}`,
-            naukri: `https://www.naukri.com/jobs-in-india?k=${encodeURIComponent(job.title || "job")}`,
-            indeed: `https://indeed.com/jobs?q=${encodeURIComponent(job.title || "job")}`,
-            glassdoor: `https://www.glassdoor.com/Job/jobs.htm?sc.keyword=${encodeURIComponent(job.title || "job")}`
-        },
-        ...job // spread the rest of job properties
-      })).filter(job => job.title !== "Missing Title - Error in AI Generation"); // filter out jobs that truly failed title generation
+  async (input): Promise<JobRecommenderOutput> => {
+    const promptResponse: GenerateResponse<z.infer<typeof jobRecommenderPrompt.outputSchema>> = await jobRecommenderPrompt.generate(input);
+    const rawOutput = promptResponse.output();
+
+    if (!rawOutput || !rawOutput.jobs) {
+      console.error(
+        "JobRecommenderFlow: Schema validation failed or LLM returned no/invalid jobs array. LLM response snippet:",
+        JSON.stringify(promptResponse.candidates[0]?.message.content[0]?.data).substring(0, 500)
+      );
+      return { jobs: [] }; // Return a valid default structure
     }
-    return output!;
+    
+    const processedJobs: RecommendedJob[] = [];
+
+    for (const job of rawOutput.jobs) {
+      const currentJob = job || {}; // Handle case where a job object in the array might be null
+
+      const title = (currentJob.title && currentJob.title.trim() !== "") ? currentJob.title.trim() : null;
+      
+      // If title is missing or empty, skip this job entry entirely.
+      if (!title) {
+        console.warn("JobRecommenderFlow: Skipping job due to missing or empty title.", currentJob);
+        continue;
+      }
+
+      const company = (currentJob.company && currentJob.company.trim() !== "") ? currentJob.company.trim() : "Unknown Company";
+      const description = (currentJob.description && currentJob.description.trim() !== "") ? currentJob.description.trim() : "No description provided.";
+      const relevanceScore = (typeof currentJob.relevanceScore === 'number' && currentJob.relevanceScore >= 0 && currentJob.relevanceScore <= 1) ? currentJob.relevanceScore : 0;
+      
+      const defaultSearchLinks = {
+        linkedIn: `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(title)}`,
+        naukri: `https://www.naukri.com/jobs-in-india?k=${encodeURIComponent(title)}`,
+        indeed: `https://indeed.com/jobs?q=${encodeURIComponent(title)}`,
+        glassdoor: `https://www.glassdoor.com/Job/jobs.htm?sc.keyword=${encodeURIComponent(title)}`
+      };
+      
+      const currentLinks = currentJob.suggestedSearchLinks || {};
+
+      processedJobs.push({
+        title,
+        company,
+        description,
+        relevanceScore,
+        suggestedSearchLinks: {
+            linkedIn: currentLinks.linkedIn || defaultSearchLinks.linkedIn,
+            naukri: currentLinks.naukri || defaultSearchLinks.naukri,
+            indeed: currentLinks.indeed || defaultSearchLinks.indeed,
+            glassdoor: currentLinks.glassdoor || defaultSearchLinks.glassdoor,
+        },
+      });
+    }
+    
+    return { jobs: processedJobs };
   }
 );
+
