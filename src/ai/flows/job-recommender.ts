@@ -53,11 +53,11 @@ const jobRecommenderPrompt = ai.definePrompt({
   output: {schema: z.object({jobs: z.array(RecommendedJobSchemaLax)})}, // Use lax schema for LLM output
   prompt: `You are an expert career advisor and job recommender. Based on the following resume details, suggest 3-5 job roles.
 For each and every job role, you MUST provide:
-1.  A plausible job title (the 'title' field). This is an absolutely critical and mandatory field. Without a title, the recommendation is useless.
+1.  A plausible job title (the 'title' field). This is an absolutely critical and mandatory field. Without a title, the recommendation is useless. If you cannot confidently generate a valid, non-empty title, you should omit that entire job entry from your response.
 2.  A plausible company name (the 'company' field). This is mandatory.
 3.  A brief description (1-2 sentences) explaining why this job is a good fit for the candidate, referencing their skills and experience (the 'description' field). This is mandatory.
 4.  A relevance score (a number between 0.0 and 1.0) indicating how relevant this job is to the provided resume details (the 'relevanceScore' field). This is mandatory.
-5.  Suggested search URLs for finding similar jobs on LinkedIn, Naukri, Indeed, and Glassdoor (the 'suggestedSearchLinks' object with its respective string fields). These URLs should be functional search queries. For example, for LinkedIn: 'https://www.linkedin.com/jobs/search/?keywords=TITLE%20COMPANY&location=REGION' or similar constructive search links. This 'suggestedSearchLinks' object is mandatory.
+5.  Suggested search URLs for finding similar jobs on LinkedIn, Naukri, Indeed, and Glassdoor (the 'suggestedSearchLinks' object with its respective string fields). These URLs should be functional search queries. For example, for LinkedIn: 'https://www.linkedin.com/jobs/search/?keywords=TITLE%20COMPANY&location=REGION' or similar constructive search links. This 'suggestedSearchLinks' object is mandatory. Even if specific links are hard to generate, provide valid default search query URLs for each platform based on the job title.
 
 Resume Details:
 Skills: {{#each skills}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}
@@ -67,6 +67,7 @@ Experience Summary: {{{experienceSummary}}}
 Generate recommendations that are diverse and cover different potential career paths if applicable.
 Ensure ALL required fields, especially 'title', 'company', 'description', 'relevanceScore', and 'suggestedSearchLinks', are present for *every* job object in the 'jobs' array.
 The output must strictly adhere to the JSON schema, paying close attention to required fields for each job object. The 'title' field is paramount.
+Do not include job entries if they lack a valid 'title'.
 `,
 });
 
@@ -77,10 +78,15 @@ const jobRecommenderFlow = ai.defineFlow(
     outputSchema: JobRecommenderOutputSchema, // Flow's final output must adhere to the strict schema
   },
   async (input): Promise<JobRecommenderOutput> => {
+    // Use a more descriptive variable name for the raw response from the prompt
     const llmResponse = await jobRecommenderPrompt(input);
+    // Access the output property from the response
     const rawOutput = llmResponse.output;
 
+
     if (!rawOutput || !rawOutput.jobs) {
+      // Log more detailed error information if available from the LLM response
+      // This helps in debugging if the LLM fails to adhere to the schema
       const firstCandidateMessageContent = llmResponse.candidates?.[0]?.message?.content?.[0];
       const errorDetails = firstCandidateMessageContent?.data ?? firstCandidateMessageContent?.text ?? "No detailed error message available from LLM.";
       
