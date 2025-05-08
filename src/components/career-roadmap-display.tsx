@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { LoadingIndicator } from './loading-indicator';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { DraftingCompass, TrendingUp, Lightbulb, Award, BadgeDollarSign, CheckSquare, ExternalLink, Clock3, Info } from 'lucide-react';
+import { DraftingCompass, TrendingUp, Lightbulb, Award, BadgeDollarSign, CheckSquare, ExternalLink, Clock3, Info, Brain, BookOpen } from 'lucide-react';
 import { Separator } from './ui/separator';
 import { Badge } from './ui/badge';
 
@@ -76,7 +76,7 @@ export function CareerRoadmapDisplay({ analysisResult }: CareerRoadmapDisplayPro
           </span>
           <div>
             <CardTitle className="text-2xl font-bold text-primary">Career Roadmap Generator</CardTitle>
-            <CardDescription>Enter your target role to get a personalized step-by-step plan.</CardDescription>
+            <CardDescription>Enter your target role to get a personalized step-by-step plan. Inspired by resources like roadmap.sh.</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -112,25 +112,38 @@ export function CareerRoadmapDisplay({ analysisResult }: CareerRoadmapDisplayPro
             </Card>
 
             <SectionWrapper title="Your Actionable Steps" icon={<TrendingUp className="w-5 h-5" />}>
-              <Accordion type="single" collapsible className="w-full">
+              <Accordion type="single" collapsible className="w-full" defaultValue="step-0">
                 {roadmap.steps.map((step, index) => (
                   <AccordionItem value={`step-${index}`} key={index} className="border-border">
-                    <AccordionTrigger className="hover:no-underline">
-                      <div className="flex items-center text-left">
-                        <CheckSquare className="w-5 h-5 mr-3 text-accent flex-shrink-0" />
+                    <AccordionTrigger className="hover:no-underline text-left">
+                      <div className="flex items-start space-x-3">
+                        <CheckSquare className="w-5 h-5 mt-1 text-accent flex-shrink-0" />
                         <span className="font-medium text-base text-foreground">{step.title}</span>
                       </div>
                     </AccordionTrigger>
-                    <AccordionContent className="pl-8 space-y-2 text-sm">
-                      <p className="text-muted-foreground">{step.description}</p>
-                      <div className="flex items-center text-xs text-muted-foreground">
+                    <AccordionContent className="pl-8 pr-2 space-y-3 text-sm">
+                      <p className="text-muted-foreground whitespace-pre-line">{step.description}</p>
+                      
+                      {step.keySkillsToDevelop && step.keySkillsToDevelop.length > 0 && (
+                        <div className="mt-2">
+                          <p className="font-semibold text-foreground/90 mb-1 flex items-center"><Brain className="w-4 h-4 mr-2 text-primary" /> Key Skills to Develop:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {step.keySkillsToDevelop.map((skill, i) => 
+                              <Badge key={i} variant="secondary" className="text-xs">{skill}</Badge>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center text-xs text-muted-foreground mt-2">
                         <Clock3 className="w-3.5 h-3.5 mr-1.5" />
-                        Timeline: {step.estimatedTimeline}
+                        Estimated Timeline: {step.estimatedTimeline}
                       </div>
+
                       {step.resources && step.resources.length > 0 && (
-                        <div>
-                          <p className="font-medium text-foreground/90 mt-1">Suggested Resources:</p>
-                          <ul className="list-disc list-inside pl-1 text-muted-foreground">
+                        <div className="mt-2">
+                          <p className="font-semibold text-foreground/90 mb-1 flex items-center"><BookOpen className="w-4 h-4 mr-2 text-primary"/>Suggested Resources:</p>
+                          <ul className="list-disc list-inside pl-1 text-muted-foreground space-y-1">
                             {step.resources.map((res, i) => <li key={i}>{res}</li>)}
                           </ul>
                         </div>
@@ -144,9 +157,9 @@ export function CareerRoadmapDisplay({ analysisResult }: CareerRoadmapDisplayPro
             <div className="grid md:grid-cols-2 gap-6">
               {roadmap.potentialCertifications && roadmap.potentialCertifications.length > 0 && (
                 <SectionWrapper title="Potential Certifications" icon={<Award className="w-5 h-5" />}>
-                  <div className="space-y-1">
+                  <div className="flex flex-wrap gap-2">
                     {roadmap.potentialCertifications.map((cert, index) => (
-                       <Badge key={index} variant="outline" className="mr-2 mb-1 p-2 text-sm">{cert}</Badge>
+                       <Badge key={index} variant="outline" className="p-2 text-sm">{cert}</Badge>
                     ))}
                   </div>
                 </SectionWrapper>
@@ -175,11 +188,11 @@ export function CareerRoadmapDisplay({ analysisResult }: CareerRoadmapDisplayPro
                 <p className="text-sm text-center w-full text-muted-foreground italic">{roadmap.closingMotivation}</p>
             </CardFooter>
             
-             <Alert variant="default" className="mt-6 bg-blue-50 border-blue-200 text-blue-700">
-                <Info className="h-5 w-5 text-blue-600" />
-                <AlertTitle className="font-semibold text-blue-800">Roadmap Disclaimer</AlertTitle>
+             <Alert variant="default" className="mt-6 bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-300">
+                <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                <AlertTitle className="font-semibold text-blue-800 dark:text-blue-200">Roadmap Disclaimer</AlertTitle>
                 <AlertDescription className="text-sm">
-                    This roadmap is AI-generated based on common career paths and your resume. It's a guide, not a guarantee.
+                    This roadmap is AI-generated based on common career paths and your resume, aiming for a style similar to roadmap.sh. It's a guide, not a guarantee.
                     Always research specific job requirements and adapt your plan as you learn and grow.
                 </AlertDescription>
             </Alert>
@@ -189,3 +202,4 @@ export function CareerRoadmapDisplay({ analysisResult }: CareerRoadmapDisplayPro
     </Card>
   );
 }
+
