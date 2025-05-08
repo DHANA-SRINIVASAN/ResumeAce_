@@ -1,7 +1,7 @@
 // src/components/career-roadmap-display.tsx
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import type { AnalyzeResumeOutput } from '@/ai/flows/resume-analyzer';
 import { generateCareerRoadmap, type CareerRoadmapOutput, type RoadmapStep } from '@/ai/flows/career-roadmap-flow';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,24 +9,188 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { LoadingIndicator } from './loading-indicator';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { DraftingCompass, TrendingUp, Lightbulb, Award, BadgeDollarSign, CheckSquare, ExternalLink, Clock3, Info, Brain, BookOpen } from 'lucide-react';
+import { DraftingCompass, TrendingUp, Lightbulb, Award, BadgeDollarSign, CheckSquare, ExternalLink, Clock3, Info, Brain, BookOpen, Download, CircleHelp, CircleCheck, CircleDotDashed } from 'lucide-react';
 import { Separator } from './ui/separator';
 import { Badge } from './ui/badge';
+
+import ReactFlow, {
+  Controls,
+  Background,
+  useNodesState,
+  useEdgesState,
+  addEdge,
+  type Node,
+  type Edge,
+  Position,
+  MarkerType,
+  ReactFlowProvider,
+  useReactFlow,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
 
 interface CareerRoadmapDisplayProps {
   analysisResult: AnalyzeResumeOutput | null;
 }
 
-const SectionWrapper: React.FC<{ title: string; icon: React.ReactNode; children: React.ReactNode }> = ({ title, icon, children }) => (
-  <div className="mt-6">
-    <div className="flex items-center mb-3">
-      <span className="text-primary mr-2">{icon}</span>
-      <h3 className="text-lg font-semibold text-primary">{title}</h3>
+const calculateSkillCoverage = (resumeSkills: string[] = [], roadmapSkills: string[] = []): number => {
+  if (!resumeSkills.length || !roadmapSkills.length) return 0;
+  const lowerResumeSkills = new Set(resumeSkills.map(s => s.toLowerCase().trim()));
+  const lowerRoadmapSkills = roadmapSkills.map(s => s.toLowerCase().trim());
+  
+  const matchedSkills = lowerRoadmapSkills.filter(rs => lowerResumeSkills.has(rs));
+  return (matchedSkills.length / lowerRoadmapSkills.length) * 100;
+};
+
+const CustomNode = ({ data }: { data: any }) => {
+  let NodeIcon = CircleHelp;
+  let iconColor = "text-muted-foreground";
+  let borderColor = "border-border";
+
+  if (data.coverageStatus === 'covered') {
+    NodeIcon = CircleCheck;
+    iconColor = "text-green-500";
+    borderColor = "border-green-500";
+  } else if (data.coverageStatus === 'partial') {
+    NodeIcon = CircleDotDashed;
+    iconColor = "text-yellow-500";
+    borderColor = "border-yellow-500";
+  }
+
+
+  return (
+    <Card className={`shadow-md hover:shadow-lg transition-shadow w-72 ${borderColor} border-2`}>
+      <CardHeader className="p-3">
+        <div className="flex items-start space-x-2">
+          <NodeIcon className={`w-5 h-5 mt-0.5 ${iconColor} shrink-0`} />
+          <CardTitle className="text-base font-semibold text-primary">{data.label}</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent className="p-3 text-xs space-y-1">
+        <p className="text-muted-foreground line-clamp-3">{data.description}</p>
+        {data.timeline && <p className="flex items-center"><Clock3 className="w-3 h-3 mr-1" />{data.timeline}</p>}
+        {data.skills && data.skills.length > 0 && (
+          <div>
+            <p className="font-medium text-foreground/90 flex items-center"><Brain className="w-3 h-3 mr-1 text-primary" /> Skills:</p>
+            <div className="flex flex-wrap gap-1 mt-0.5">
+              {data.skills.slice(0, 3).map((skill:string, i:number) => <Badge key={i} variant="secondary" className="text-xs px-1 py-0.5">{skill}</Badge>)}
+              {data.skills.length > 3 && <Badge variant="outline" className="text-xs px-1 py-0.5">+{data.skills.length - 3} more</Badge>}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+const nodeTypes = { custom: CustomNode };
+
+const RoadmapFlow = ({ roadmap, analysisResult }: { roadmap: CareerRoadmapOutput, analysisResult: AnalyzeResumeOutput | null }) => {
+  const { getNodes, getEdges, toPng } = useReactFlow();
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+
+  React.useEffect(() => {
+    if (roadmap && roadmap.steps) {
+      const initialNodes: Node[] = roadmap.steps.map((step, index) => {
+        const coverage = calculateSkillCoverage(analysisResult?.skills, step.keySkillsToDevelop);
+        let coverageStatus = 'new';
+        if (coverage >= 75) coverageStatus = 'covered';
+        else if (coverage >= 25) coverageStatus = 'partial';
+
+        return {
+          id: `step-${index}`,
+          type: 'custom',
+          data: { 
+            label: step.title, 
+            description: step.description,
+            skills: step.keySkillsToDevelop,
+            timeline: step.estimatedTimeline,
+            resources: step.resources,
+            coverageStatus: coverageStatus,
+          },
+          position: { x: 0, y: index * 200 }, // Adjust Y for vertical layout
+        };
+      });
+
+      const initialEdges: Edge[] = roadmap.steps.slice(0, -1).map((_, index) => ({
+        id: `edge-${index}-${index + 1}`,
+        source: `step-${index}`,
+        target: `step-${index + 1}`,
+        type: 'smoothstep',
+        markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(var(--primary))' },
+        style: { stroke: 'hsl(var(--primary))', strokeWidth: 2 },
+      }));
+      
+      setNodes(initialNodes);
+      setEdges(initialEdges);
+    }
+  }, [roadmap, analysisResult, setNodes, setEdges]);
+
+  const onConnect = useCallback(
+    (params: Edge) => setEdges((eds) => addEdge(params, eds)),
+    [setEdges]
+  );
+  
+  const handleDownloadImage = useCallback(() => {
+    toPng().then((dataUrl) => {
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = "career_roadmap.png";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }).catch(err => console.error("Failed to download image", err));
+  }, [toPng]);
+
+
+  return (
+    <div style={{ height: '600px', width: '100%' }} className="mt-6 border rounded-lg shadow-inner bg-muted/20">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        nodeTypes={nodeTypes}
+        fitView
+        attributionPosition="bottom-left"
+        className="rounded-lg"
+      >
+        <Controls className="[&_button]:bg-background [&_button]:border-border [&_button_path]:fill-foreground" />
+        <Background color="hsl(var(--border))" gap={16} />
+      </ReactFlow>
+      <div className="p-2 flex justify-end">
+        <Button onClick={handleDownloadImage} variant="outline" size="sm">
+          <Download className="w-4 h-4 mr-2" />
+          Download Roadmap (PNG)
+        </Button>
+      </div>
     </div>
-    {children}
-  </div>
-);
+  );
+};
+
+const AdditionalInfoSection: React.FC<{ title: string; icon: React.ReactNode; items?: string[]; children?: React.ReactNode; badgeVariant?: "default" | "secondary" | "destructive" | "outline" }> = ({ title, icon, items, children, badgeVariant = "outline" }) => {
+  if (!items && !children) return null;
+  if (items && items.length === 0 && !children) return null;
+
+  return (
+    <div className="mt-4">
+      <div className="flex items-center mb-2">
+        <span className="text-primary mr-2">{icon}</span>
+        <h4 className="text-md font-semibold text-primary">{title}</h4>
+      </div>
+      {items && items.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {items.map((item, index) => (
+            <Badge key={index} variant={badgeVariant} className="p-2 text-sm">{item}</Badge>
+          ))}
+        </div>
+      )}
+      {children && <div className="text-sm text-muted-foreground">{children}</div>}
+    </div>
+  );
+};
+
 
 export function CareerRoadmapDisplay({ analysisResult }: CareerRoadmapDisplayProps) {
   const [targetRole, setTargetRole] = useState('');
@@ -46,9 +210,7 @@ export function CareerRoadmapDisplay({ analysisResult }: CareerRoadmapDisplayPro
     setRoadmap(null);
 
     try {
-      // Infer current role (simplified)
       const currentRole = analysisResult.experience?.split('\n')[0]?.split(' at ')[0] || "current profile";
-
       const result = await generateCareerRoadmap({
         resumeAnalysis: analysisResult,
         currentRole: currentRole,
@@ -76,7 +238,7 @@ export function CareerRoadmapDisplay({ analysisResult }: CareerRoadmapDisplayPro
           </span>
           <div>
             <CardTitle className="text-2xl font-bold text-primary">Career Roadmap Generator</CardTitle>
-            <CardDescription>Enter your target role to get a personalized step-by-step plan. Inspired by resources like roadmap.sh.</CardDescription>
+            <CardDescription>Enter your target role to get a personalized step-by-step visual plan, inspired by <a href="https://roadmap.sh" target="_blank" rel="noopener noreferrer" className="underline hover:text-accent">roadmap.sh</a>.</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -110,76 +272,21 @@ export function CareerRoadmapDisplay({ analysisResult }: CareerRoadmapDisplayPro
             <Card className="bg-secondary/30 p-4 rounded-lg">
               <p className="text-sm text-foreground">{roadmap.introduction}</p>
             </Card>
-
-            <SectionWrapper title="Your Actionable Steps" icon={<TrendingUp className="w-5 h-5" />}>
-              <Accordion type="single" collapsible className="w-full" defaultValue="step-0">
-                {roadmap.steps.map((step, index) => (
-                  <AccordionItem value={`step-${index}`} key={index} className="border-border">
-                    <AccordionTrigger className="hover:no-underline text-left">
-                      <div className="flex items-start space-x-3">
-                        <CheckSquare className="w-5 h-5 mt-1 text-accent flex-shrink-0" />
-                        <span className="font-medium text-base text-foreground">{step.title}</span>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="pl-8 pr-2 space-y-3 text-sm">
-                      <p className="text-muted-foreground whitespace-pre-line">{step.description}</p>
-                      
-                      {step.keySkillsToDevelop && step.keySkillsToDevelop.length > 0 && (
-                        <div className="mt-2">
-                          <p className="font-semibold text-foreground/90 mb-1 flex items-center"><Brain className="w-4 h-4 mr-2 text-primary" /> Key Skills to Develop:</p>
-                          <div className="flex flex-wrap gap-2">
-                            {step.keySkillsToDevelop.map((skill, i) => 
-                              <Badge key={i} variant="secondary" className="text-xs">{skill}</Badge>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex items-center text-xs text-muted-foreground mt-2">
-                        <Clock3 className="w-3.5 h-3.5 mr-1.5" />
-                        Estimated Timeline: {step.estimatedTimeline}
-                      </div>
-
-                      {step.resources && step.resources.length > 0 && (
-                        <div className="mt-2">
-                          <p className="font-semibold text-foreground/90 mb-1 flex items-center"><BookOpen className="w-4 h-4 mr-2 text-primary"/>Suggested Resources:</p>
-                          <ul className="list-disc list-inside pl-1 text-muted-foreground space-y-1">
-                            {step.resources.map((res, i) => <li key={i}>{res}</li>)}
-                          </ul>
-                        </div>
-                      )}
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            </SectionWrapper>
+            
+            <ReactFlowProvider>
+              <RoadmapFlow roadmap={roadmap} analysisResult={analysisResult} />
+            </ReactFlowProvider>
             
             <div className="grid md:grid-cols-2 gap-6">
-              {roadmap.potentialCertifications && roadmap.potentialCertifications.length > 0 && (
-                <SectionWrapper title="Potential Certifications" icon={<Award className="w-5 h-5" />}>
-                  <div className="flex flex-wrap gap-2">
-                    {roadmap.potentialCertifications.map((cert, index) => (
-                       <Badge key={index} variant="outline" className="p-2 text-sm">{cert}</Badge>
-                    ))}
-                  </div>
-                </SectionWrapper>
-              )}
-
-              {roadmap.projectIdeas && roadmap.projectIdeas.length > 0 && (
-                <SectionWrapper title="Project Ideas for Portfolio" icon={<Lightbulb className="w-5 h-5" />}>
-                  <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                    {roadmap.projectIdeas.map((idea, index) => <li key={index}>{idea}</li>)}
-                  </ul>
-                </SectionWrapper>
-              )}
+                <AdditionalInfoSection title="Potential Certifications" icon={<Award className="w-5 h-5" />} items={roadmap.potentialCertifications} badgeVariant="secondary" />
+                <AdditionalInfoSection title="Project Ideas for Portfolio" icon={<Lightbulb className="w-5 h-5" />} items={roadmap.projectIdeas} />
             </div>
 
-
             {roadmap.estimatedSalaryRange && (
-              <SectionWrapper title="Estimated Salary Range (General)" icon={<BadgeDollarSign className="w-5 h-5" />}>
+              <AdditionalInfoSection title="Estimated Salary Range (General)" icon={<BadgeDollarSign className="w-5 h-5" />}>
                 <p className="text-lg font-semibold text-accent">{roadmap.estimatedSalaryRange}</p>
                 <p className="text-xs text-muted-foreground">Note: Actual salaries vary by location, experience, and company.</p>
-              </SectionWrapper>
+              </AdditionalInfoSection>
             )}
             
             <Separator className="my-6"/>
@@ -192,8 +299,8 @@ export function CareerRoadmapDisplay({ analysisResult }: CareerRoadmapDisplayPro
                 <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 <AlertTitle className="font-semibold text-blue-800 dark:text-blue-200">Roadmap Disclaimer</AlertTitle>
                 <AlertDescription className="text-sm">
-                    This roadmap is AI-generated based on common career paths and your resume, aiming for a style similar to roadmap.sh. It's a guide, not a guarantee.
-                    Always research specific job requirements and adapt your plan as you learn and grow.
+                    This visual roadmap is AI-generated based on common career paths (inspired by sites like roadmap.sh) and your resume. It's a guide, not a guarantee.
+                    Always research specific job requirements and adapt your plan as you learn and grow. Node colors indicate skill coverage: Green (Covered), Yellow (Partial), Grey (New).
                 </AlertDescription>
             </Alert>
           </div>
@@ -202,4 +309,3 @@ export function CareerRoadmapDisplay({ analysisResult }: CareerRoadmapDisplayPro
     </Card>
   );
 }
-

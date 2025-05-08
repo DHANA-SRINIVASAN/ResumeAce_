@@ -71,7 +71,7 @@ Target Role: {{{targetRole}}}
 
 Please generate the roadmap with the following sections, ensuring the 'steps' are particularly detailed:
 1.  Introduction: Briefly acknowledge the user's current standing (based on resume) and their aspiration for the target role.
-2.  Steps: Create a list of 3-5 actionable steps. Each step should include:
+2.  Steps: Create a list of detailed, logically sequenced actionable steps (typically 5-10, depending on complexity). Each step should represent a significant milestone or learning area. If a step itself is very broad, break it down in its description or suggest it could be multiple smaller efforts. Each step should include:
     *   title: A concise title for the step (e.g., "Foundational Python and Data Structures").
     *   description: Detailed actions, core concepts to understand, skills to acquire, or experiences to gain. Explain *why* these are important for the progression.
     *   keySkillsToDevelop: (Optional) A list of 3-5 specific skills to focus on during this step (e.g., "Python", "SQL", "Pandas", "Algorithms").
@@ -96,7 +96,18 @@ const careerRoadmapFlow = ai.defineFlow(
   },
   async (input) => {
     const { output } = await careerRoadmapPrompt(input);
+    // Ensure steps array exists
+    if (output && !output.steps) {
+        output.steps = [];
+    }
+    // Ensure keySkillsToDevelop and resources are arrays within each step
+    if (output && output.steps) {
+        output.steps = output.steps.map(step => ({
+            ...step,
+            keySkillsToDevelop: step.keySkillsToDevelop || [],
+            resources: step.resources || [],
+        }));
+    }
     return output!;
   }
 );
-

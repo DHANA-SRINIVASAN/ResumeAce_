@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import ReactFlow base styles */
+@import 'reactflow/dist/style.css';
+
 @layer base {
   :root {
     --background: 200 17% 94%; /* Light Gray #ecf0f1 */
@@ -81,4 +84,44 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Custom ReactFlow Styles (Optional - can be adapted further) */
+.react-flow__node-custom {
+  @apply bg-card border-2 border-primary rounded-lg shadow-lg p-0 text-card-foreground;
+  font-size: 12px;
+  width: 280px; /* Ensure custom nodes have a defined width */
+}
+
+.react-flow__node-custom .react-flow__handle {
+  @apply bg-primary;
+  width: 8px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.react-flow__edge path {
+  @apply stroke-primary;
+  stroke-width: 2;
+}
+
+.react-flow__controls button {
+    @apply bg-card border-border text-foreground hover:bg-muted;
+}
+.react-flow__controls button path {
+    @apply fill-current;
+}
+
+.react-flow__background path {
+    @apply stroke-border;
+}
+
+.dark .react-flow__controls button {
+    @apply bg-card border-border text-foreground hover:bg-muted;
+}
+.dark .react-flow__controls button path {
+    @apply fill-current;
+}
+.dark .react-flow__background path {
+    @apply stroke-border;
 }
