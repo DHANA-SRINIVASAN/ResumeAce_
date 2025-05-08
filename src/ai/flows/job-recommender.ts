@@ -10,7 +10,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z}from 'genkit';
-import type { GenerateResponse } from 'genkit/generate';
+import type { GenerateResponseData } from 'genkit/generate'; // Correct type for prompt output
 
 const JobRecommenderInputSchema = z.object({
   skills: z.array(z.string()).describe('A list of skills from the resume.'),
@@ -77,14 +77,21 @@ const jobRecommenderFlow = ai.defineFlow(
     outputSchema: JobRecommenderOutputSchema, // Flow's final output must adhere to the strict schema
   },
   async (input): Promise<JobRecommenderOutput> => {
-    const promptResponse: GenerateResponse<z.infer<typeof jobRecommenderPrompt.outputSchema>> = await jobRecommenderPrompt.generate(input);
-    const rawOutput = promptResponse.output();
+    const llmResponse = await jobRecommenderPrompt(input);
+    const rawOutput = llmResponse.output;
 
     if (!rawOutput || !rawOutput.jobs) {
+      const firstCandidateMessageContent = llmResponse.candidates?.[0]?.message?.content?.[0];
+      const errorDetails = firstCandidateMessageContent?.data ?? firstCandidateMessageContent?.text ?? "No detailed error message available from LLM.";
+      
       console.error(
-        "JobRecommenderFlow: Schema validation failed or LLM returned no/invalid jobs array. LLM response snippet:",
-        JSON.stringify(promptResponse.candidates[0]?.message.content[0]?.data).substring(0, 500)
+        "JobRecommenderFlow: Schema validation failed or LLM returned no/invalid jobs array. LLM response content:",
+        JSON.stringify(errorDetails).substring(0, 1000) // Log more details if available
       );
+      // Include original error if available in llmResponse, for more context
+      if (llmResponse.error) {
+        console.error("JobRecommenderFlow: Underlying Genkit error:", llmResponse.error);
+      }
       return { jobs: [] }; // Return a valid default structure
     }
     
