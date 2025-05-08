@@ -19,42 +19,20 @@ function escapeCsvCell(cell: string | undefined | null): string {
 export function exportAnalysisToCsv(analysis: AnalyzeResumeOutput, filename: string = 'resume-analysis.csv'): void {
   const rows: string[][] = [];
 
-  // Header row for the CSV
-  rows.push(['Category', 'Details']);
+  // Header row based on user's specified order
+  rows.push(['Name', 'Skills', 'Experience', 'Projects']);
 
-  // Add Name
-  rows.push(['Name', escapeCsvCell(analysis.name)]);
-
-  // Add Contact Details
-  rows.push(['Contact Details', escapeCsvCell(analysis.contactDetails)]);
-
-  // Add Skills section
-  rows.push(['Skills', '']); // Main category header
-  if (analysis.skills && analysis.skills.length > 0) {
-    analysis.skills.forEach(skill => {
-      rows.push(['', escapeCsvCell(skill)]); // Each skill as a sub-item
-    });
-  } else {
-    rows.push(['', 'N/A']);
-  }
-
-  // Add Education
-  // Education can be a long text, ensure it's properly escaped.
-  rows.push(['Education', escapeCsvCell(analysis.education)]);
-
-  // Add Experience
-  // Experience can also be a long text.
-  rows.push(['Experience', escapeCsvCell(analysis.experience)]);
-
-  // Add Projects section
-  rows.push(['Projects', '']); // Main category header
-  if (analysis.projects && analysis.projects.length > 0) {
-    analysis.projects.forEach(project => {
-      rows.push(['', escapeCsvCell(project)]); // Each project as a sub-item
-    });
-  } else {
-    rows.push(['', 'N/A']);
-  }
+  // Data row
+  const skillsString = analysis.skills && analysis.skills.length > 0 ? analysis.skills.join('\n') : '';
+  const experienceString = analysis.experience || '';
+  const projectsString = analysis.projects && analysis.projects.length > 0 ? analysis.projects.join('\n') : '';
+  
+  rows.push([
+    escapeCsvCell(analysis.name),
+    escapeCsvCell(skillsString),
+    escapeCsvCell(experienceString),
+    escapeCsvCell(projectsString)
+  ]);
 
   // Convert rows to CSV string
   const csvContent = rows.map(e => e.join(",")).join("\n");
