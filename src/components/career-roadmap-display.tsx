@@ -3,7 +3,7 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import type { AnalyzeResumeOutput } from '@/ai/flows/resume-analyzer';
-import { generateCareerRoadmap, type CareerRoadmapOutput, type RoadmapNode, type RoadmapEdge } from '@/ai/flows/career-roadmap-flow';
+import { generateCareerRoadmap, type CareerRoadmapOutput, type RoadmapNode, type RoadmapEdge, type RoadmapResource } from '@/ai/flows/career-roadmap-flow';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -52,7 +52,7 @@ const NodeIcon: React.FC<{ stage: RoadmapNode['stage'], coverageStatus: 'covered
   return <IconComponent className={`w-5 h-5 mt-0.5 ${iconColor} shrink-0`} />;
 };
 
-const CustomNode = ({ data }: { data: any }) => { // data is a RoadmapNode plus coverageStatus
+const CustomNode = ({ data }: { data: RoadmapNode & { coverageStatus: 'covered' | 'new' } }) => {
   let borderColor = "border-border";
   if (data.coverageStatus === 'covered') {
     borderColor = "border-green-500";
@@ -81,10 +81,29 @@ const CustomNode = ({ data }: { data: any }) => { // data is a RoadmapNode plus 
       <CardContent className="p-3 text-xs space-y-1">
         {data.description && <p className="text-muted-foreground line-clamp-3">{data.description}</p>}
         {data.resources && data.resources.length > 0 && (
-          <div>
-            <p className="font-medium text-foreground/90 flex items-center"><BookOpen className="w-3 h-3 mr-1 text-accent" /> Resources:</p>
-            <ul className="list-disc list-inside pl-2">
-              {data.resources.slice(0, 2).map((res:string, i:number) => <li key={i} className="truncate">{res}</li>)}
+          <div className="mt-1.5">
+            <p className="font-medium text-foreground/90 flex items-center text-xs mb-0.5">
+              <BookOpen className="w-3 h-3 mr-1 text-accent shrink-0" /> Resources:
+            </p>
+            <ul className="space-y-0.5 pl-1">
+              {data.resources.slice(0, 2).map((res: RoadmapResource, i: number) => (
+                <li key={i} className="text-xs truncate">
+                  {res.url ? (
+                    <a
+                      href={res.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline hover:text-accent transition-colors duration-200 flex items-center"
+                      title={res.name} // Show full name on hover
+                    >
+                      <span className="truncate">{res.name}</span>
+                      <ExternalLink className="w-2.5 h-2.5 ml-1 shrink-0" />
+                    </a>
+                  ) : (
+                    <span title={res.name}>{res.name}</span>
+                  )}
+                </li>
+              ))}
             </ul>
           </div>
         )}
