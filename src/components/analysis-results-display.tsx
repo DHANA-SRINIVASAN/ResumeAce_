@@ -3,8 +3,10 @@
 import type { AnalyzeResumeOutput } from '@/ai/flows/resume-analyzer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { User, Mail, Phone, Briefcase, GraduationCap, Lightbulb, CheckSquare, ExternalLink, Asterisk } from 'lucide-react';
+import { User, Mail, Phone, Briefcase, GraduationCap, Lightbulb, CheckSquare, ExternalLink, Asterisk, Download } from 'lucide-react';
 import { Separator } from './ui/separator';
+import { Button } from '@/components/ui/button';
+import { exportAnalysisToCsv } from '@/lib/csv-utils';
 
 interface AnalysisResultsDisplayProps {
   analysis: AnalyzeResumeOutput;
@@ -50,6 +52,11 @@ const DetailItem: React.FC<{ icon: React.ReactNode; label: string; value?: strin
 export function AnalysisResultsDisplay({ analysis }: AnalysisResultsDisplayProps) {
   const { name, contactDetails, skills, education, experience, projects } = analysis;
 
+  const handleDownload = () => {
+    const safeName = (name || 'resume').replace(/[^a-z0-9_]+/gi, '_').toLowerCase();
+    exportAnalysisToCsv(analysis, `${safeName}_analysis.csv`);
+  };
+
   return (
     <div className="space-y-6">
       <Card className="shadow-lg border-primary border-2">
@@ -59,6 +66,17 @@ export function AnalysisResultsDisplay({ analysis }: AnalysisResultsDisplayProps
           </div>
           <CardTitle className="text-3xl font-bold text-primary">{name || 'N/A'}</CardTitle>
           <CardDescription className="text-base text-muted-foreground">{contactDetails || 'No contact details found'}</CardDescription>
+          <div className="mt-4">
+            <Button 
+              onClick={handleDownload}
+              variant="outline"
+              size="sm"
+              className="shadow-sm hover:shadow-md transition-shadow"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Download Analysis (CSV)
+            </Button>
+          </div>
         </CardHeader>
       </Card>
       
