@@ -20,7 +20,6 @@ const acceptedFileTypes: Record<string, string[]> = {
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
   'image/jpeg': ['.jpeg', '.jpg'],
   'image/png': ['.png'],
-  // Potentially add more image types if needed
 };
 const acceptedFileExtensions = Object.values(acceptedFileTypes).flat().join(',');
 
@@ -32,7 +31,7 @@ export function ResumeUploadForm({ onAnalyze, isProcessing }: ResumeUploadFormPr
   const { toast } = useToast();
   const [showImageNote, setShowImageNote] = useState(false);
 
-  const handleFileChange = (file: File | null) => {
+  const handleFileChange = useCallback((file: File | null) => {
     if (file) {
       if (!acceptedFileTypes[file.type as keyof typeof acceptedFileTypes]) {
         toast({
@@ -42,10 +41,12 @@ export function ResumeUploadForm({ onAnalyze, isProcessing }: ResumeUploadFormPr
         });
         setSelectedFile(null);
         setShowImageNote(false);
+        if (inputRef.current) {
+            inputRef.current.value = ""; 
+        }
         return;
       }
-      // Optional: Add file size check here (e.g., max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
         toast({
           title: "File Too Large",
           description: `Please upload a file smaller than 5MB. Your file is ${(file.size / (1024*1024)).toFixed(2)}MB.`,
@@ -53,6 +54,9 @@ export function ResumeUploadForm({ onAnalyze, isProcessing }: ResumeUploadFormPr
         });
         setSelectedFile(null);
         setShowImageNote(false);
+        if (inputRef.current) {
+            inputRef.current.value = "";
+        }
         return;
       }
       setSelectedFile(file);
@@ -61,7 +65,7 @@ export function ResumeUploadForm({ onAnalyze, isProcessing }: ResumeUploadFormPr
       setSelectedFile(null);
       setShowImageNote(false);
     }
-  };
+  }, [toast]);
 
   const handleDrag = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -93,20 +97,20 @@ export function ResumeUploadForm({ onAnalyze, isProcessing }: ResumeUploadFormPr
     inputRef.current?.click();
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedFile && !isProcessing) {
       await onAnalyze(selectedFile);
     }
-  };
+  }, [selectedFile, isProcessing, onAnalyze]);
 
-  const removeFile = () => {
+  const removeFile = useCallback(() => {
     setSelectedFile(null);
     setShowImageNote(false);
     if(inputRef.current) {
-      inputRef.current.value = ""; // Reset file input
+      inputRef.current.value = ""; 
     }
-  }
+  }, []);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 p-6 bg-card rounded-xl shadow-lg">
@@ -122,13 +126,13 @@ export function ResumeUploadForm({ onAnalyze, isProcessing }: ResumeUploadFormPr
           onDragLeave={handleDrag}
           onDragOver={handleDrag}
           onDrop={handleDrop}
-          onClick={selectedFile ? undefined : onBrowseClick} // Prevent re-opening file dialog if file is selected
+          onClick={selectedFile ? undefined : onBrowseClick} 
         >
           <div className="flex flex-col items-center justify-center pt-5 pb-6">
             {selectedFile ? (
               <>
                 {selectedFile.type.startsWith('image/') ? <ImageIcon className="w-12 h-12 mb-3 text-primary" /> : <FileText className="w-12 h-12 mb-3 text-primary" />}
-                <p className="mb-2 text-sm text-foreground font-semibold">{selectedFile.name}</p>
+                <p className="mb-2 text-sm text-foreground font-semibold break-all px-2">{selectedFile.name}</p>
                 <p className="text-xs text-muted-foreground">({(selectedFile.size / 1024).toFixed(2)} KB)</p>
                  <Button variant="ghost" size="sm" onClick={(e) => {e.stopPropagation(); removeFile();}} className="mt-2 text-destructive hover:text-destructive/80">
                   <XCircle className="mr-2 h-4 w-4" /> Remove
