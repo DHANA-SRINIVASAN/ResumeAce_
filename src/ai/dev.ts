@@ -4,3 +4,8 @@ config();
 import '@/ai/flows/resume-score.ts';
 import '@/ai/flows/resume-analyzer.ts';
 import '@/ai/flows/job-recommender.ts';
+import '@/ai/flows/interactive-feedback-flow.ts';
+import '@/ai/flows/career-roadmap-flow.ts';
+import '@/ai/flows/bias-detection-flow.ts';
+import '@/ai/flows/portfolio-generator-flow.ts';
+import '@/ai/flows/course-recommender-flow.ts';

@@ -1,20 +1,26 @@
+// src/components/resume-upload-form.tsx
 "use client";
 
 import React, { useState, useRef, useCallback } from 'react';
-import { UploadCloud, FileText, XCircle } from 'lucide-react';
+import { UploadCloud, FileText, XCircle, Image as ImageIcon } from 'lucide-react'; // Added ImageIcon
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress'; // Will be used thematically
+import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+
 
 interface ResumeUploadFormProps {
   onAnalyze: (file: File) => Promise<void>;
   isProcessing: boolean;
 }
 
-const acceptedFileTypes = {
+const acceptedFileTypes: Record<string, string[]> = {
   'application/pdf': ['.pdf'],
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+  'image/jpeg': ['.jpeg', '.jpg'],
+  'image/png': ['.png'],
+  // Potentially add more image types if needed
 };
 const acceptedFileExtensions = Object.values(acceptedFileTypes).flat().join(',');
 
@@ -24,22 +30,36 @@ export function ResumeUploadForm({ onAnalyze, isProcessing }: ResumeUploadFormPr
   const [dragActive, setDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const [showImageNote, setShowImageNote] = useState(false);
 
   const handleFileChange = (file: File | null) => {
     if (file) {
       if (!acceptedFileTypes[file.type as keyof typeof acceptedFileTypes]) {
         toast({
           title: "Invalid File Type",
-          description: `Please upload a PDF or DOCX file. You uploaded: ${file.name}`,
+          description: `Please upload a PDF, DOCX, JPEG, or PNG file. You uploaded: ${file.name}`,
           variant: "destructive",
         });
         setSelectedFile(null);
+        setShowImageNote(false);
         return;
       }
-      // Optional: Add file size check here
+      // Optional: Add file size check here (e.g., max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "File Too Large",
+          description: `Please upload a file smaller than 5MB. Your file is ${(file.size / (1024*1024)).toFixed(2)}MB.`,
+          variant: "destructive",
+        });
+        setSelectedFile(null);
+        setShowImageNote(false);
+        return;
+      }
       setSelectedFile(file);
+      setShowImageNote(file.type.startsWith('image/'));
     } else {
       setSelectedFile(null);
+      setShowImageNote(false);
     }
   };
 
@@ -60,7 +80,7 @@ export function ResumeUploadForm({ onAnalyze, isProcessing }: ResumeUploadFormPr
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFileChange(e.dataTransfer.files[0]);
     }
-  }, []);
+  }, [handleFileChange]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.preventDefault();
@@ -82,6 +102,7 @@ export function ResumeUploadForm({ onAnalyze, isProcessing }: ResumeUploadFormPr
 
   const removeFile = () => {
     setSelectedFile(null);
+    setShowImageNote(false);
     if(inputRef.current) {
       inputRef.current.value = ""; // Reset file input
     }
@@ -106,7 +127,7 @@ export function ResumeUploadForm({ onAnalyze, isProcessing }: ResumeUploadFormPr
           <div className="flex flex-col items-center justify-center pt-5 pb-6">
             {selectedFile ? (
               <>
-                <FileText className="w-12 h-12 mb-3 text-primary" />
+                {selectedFile.type.startsWith('image/') ? <ImageIcon className="w-12 h-12 mb-3 text-primary" /> : <FileText className="w-12 h-12 mb-3 text-primary" />}
                 <p className="mb-2 text-sm text-foreground font-semibold">{selectedFile.name}</p>
                 <p className="text-xs text-muted-foreground">({(selectedFile.size / 1024).toFixed(2)} KB)</p>
                  <Button variant="ghost" size="sm" onClick={(e) => {e.stopPropagation(); removeFile();}} className="mt-2 text-destructive hover:text-destructive/80">
@@ -119,7 +140,7 @@ export function ResumeUploadForm({ onAnalyze, isProcessing }: ResumeUploadFormPr
                 <p className={cn("mb-2 text-sm", dragActive ? "text-primary" : "text-muted-foreground")}>
                   <span className="font-semibold">Click to upload</span> or drag and drop
                 </p>
-                <p className="text-xs text-muted-foreground">PDF or DOCX (MAX. 5MB)</p>
+                <p className="text-xs text-muted-foreground">PDF, DOCX, JPG, PNG (MAX. 5MB)</p>
               </>
             )}
           </div>
@@ -134,6 +155,17 @@ export function ResumeUploadForm({ onAnalyze, isProcessing }: ResumeUploadFormPr
           />
         </label>
       </div>
+      
+      {showImageNote && (
+        <Alert variant="default" className="mt-4 bg-primary/5 border-primary/20">
+          <ImageIcon className="h-4 w-4 text-primary" />
+          <AlertTitle className="text-primary font-medium">Image Resume Uploaded</AlertTitle>
+          <AlertDescription className="text-primary/80">
+            AI will attempt OCR (text extraction). For best results with images, ensure good clarity. Pre-converting complex image resumes to text or PDF might improve accuracy.
+          </AlertDescription>
+        </Alert>
+      )}
+
 
       {isProcessing && (
         <div className="w-full">
