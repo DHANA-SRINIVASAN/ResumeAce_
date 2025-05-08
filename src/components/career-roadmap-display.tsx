@@ -1,15 +1,15 @@
 // src/components/career-roadmap-display.tsx
 "use client";
 
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import type { AnalyzeResumeOutput } from '@/ai/flows/resume-analyzer';
-import { generateCareerRoadmap, type CareerRoadmapOutput, type RoadmapStep } from '@/ai/flows/career-roadmap-flow';
+import { generateCareerRoadmap, type CareerRoadmapOutput, type RoadmapNode, type RoadmapEdge } from '@/ai/flows/career-roadmap-flow';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { LoadingIndicator } from './loading-indicator';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
-import { DraftingCompass, TrendingUp, Lightbulb, Award, BadgeDollarSign, CheckSquare, ExternalLink, Clock3, Info, Brain, BookOpen, Download, CircleHelp, CircleCheck, CircleDotDashed } from 'lucide-react';
+import { DraftingCompass, TrendingUp, Lightbulb, Award, BadgeDollarSign, CheckSquare, ExternalLink, Clock3, Info, Brain, BookOpen, Download, CircleHelp, CircleCheck, CircleDotDashed, Network, Layers, Sparkles as SparklesIconLucide } from 'lucide-react';
 import { Separator } from './ui/separator';
 import { Badge } from './ui/badge';
 import html2canvas from 'html2canvas';
@@ -20,12 +20,11 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
   addEdge,
-  type Node,
-  type Edge,
+  type Node as ReactFlowNode,
+  type Edge as ReactFlowEdge,
   Position,
   MarkerType,
   ReactFlowProvider,
-  // useReactFlow, // No longer needed for toPng
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -33,49 +32,60 @@ interface CareerRoadmapDisplayProps {
   analysisResult: AnalyzeResumeOutput | null;
 }
 
-const calculateSkillCoverage = (resumeSkills: string[] = [], roadmapSkills: string[] = []): number => {
-  if (!resumeSkills.length || !roadmapSkills.length) return 0;
-  const lowerResumeSkills = new Set(resumeSkills.map(s => s.toLowerCase().trim()));
-  const lowerRoadmapSkills = roadmapSkills.map(s => s.toLowerCase().trim());
-  
-  const matchedSkills = lowerRoadmapSkills.filter(rs => lowerResumeSkills.has(rs));
-  return (matchedSkills.length / lowerRoadmapSkills.length) * 100;
+const NodeIcon: React.FC<{ stage: RoadmapNode['stage'], coverageStatus: 'covered' | 'new'}> = ({ stage, coverageStatus }) => {
+  let IconComponent = CircleHelp;
+  let iconColor = "text-muted-foreground";
+
+  if (coverageStatus === 'covered') {
+    IconComponent = CircleCheck;
+    iconColor = "text-green-500";
+  } else if (coverageStatus === 'new') {
+     // Differentiate icon based on stage for new skills
+    switch (stage) {
+        case "Fundamentals": IconComponent = Layers; iconColor = "text-blue-500"; break;
+        case "Core Skills": IconComponent = Network; iconColor = "text-indigo-500"; break;
+        case "Advanced Topics": IconComponent = Brain; iconColor = "text-purple-500"; break;
+        case "Optional/Nice-to-Have": IconComponent = SparklesIconLucide; iconColor = "text-pink-500"; break; 
+        default: IconComponent = CircleHelp;
+    }
+  }
+  return <IconComponent className={`w-5 h-5 mt-0.5 ${iconColor} shrink-0`} />;
 };
 
-const CustomNode = ({ data }: { data: any }) => {
-  let NodeIcon = CircleHelp;
-  let iconColor = "text-muted-foreground";
+const CustomNode = ({ data }: { data: any }) => { // data is a RoadmapNode plus coverageStatus
   let borderColor = "border-border";
-
   if (data.coverageStatus === 'covered') {
-    NodeIcon = CircleCheck;
-    iconColor = "text-green-500";
     borderColor = "border-green-500";
-  } else if (data.coverageStatus === 'partial') {
-    NodeIcon = CircleDotDashed;
-    iconColor = "text-yellow-500";
-    borderColor = "border-yellow-500";
+  } else {
+    // Color new skills based on stage
+    switch (data.stage) {
+        case "Fundamentals": borderColor = "border-blue-500"; break;
+        case "Core Skills": borderColor = "border-indigo-500"; break;
+        case "Advanced Topics": borderColor = "border-purple-500"; break;
+        case "Optional/Nice-to-Have": borderColor = "border-pink-500"; break;
+        default: borderColor = "border-border";
+    }
   }
-
 
   return (
     <Card className={`shadow-md hover:shadow-lg transition-shadow w-72 ${borderColor} border-2`}>
       <CardHeader className="p-3">
         <div className="flex items-start space-x-2">
-          <NodeIcon className={`w-5 h-5 mt-0.5 ${iconColor} shrink-0`} />
-          <CardTitle className="text-base font-semibold text-primary">{data.label}</CardTitle>
+          <NodeIcon stage={data.stage} coverageStatus={data.coverageStatus} />
+          <div>
+            <CardTitle className="text-base font-semibold text-primary">{data.label}</CardTitle>
+            <Badge variant="outline" className="text-xs mt-1">{data.stage}</Badge>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="p-3 text-xs space-y-1">
-        <p className="text-muted-foreground line-clamp-3">{data.description}</p>
-        {data.timeline && <p className="flex items-center"><Clock3 className="w-3 h-3 mr-1" />{data.timeline}</p>}
-        {data.skills && data.skills.length > 0 && (
+        {data.description && <p className="text-muted-foreground line-clamp-3">{data.description}</p>}
+        {data.resources && data.resources.length > 0 && (
           <div>
-            <p className="font-medium text-foreground/90 flex items-center"><Brain className="w-3 h-3 mr-1 text-primary" /> Skills:</p>
-            <div className="flex flex-wrap gap-1 mt-0.5">
-              {data.skills.slice(0, 3).map((skill:string, i:number) => <Badge key={i} variant="secondary" className="text-xs px-1 py-0.5">{skill}</Badge>)}
-              {data.skills.length > 3 && <Badge variant="outline" className="text-xs px-1 py-0.5">+{data.skills.length - 3} more</Badge>}
-            </div>
+            <p className="font-medium text-foreground/90 flex items-center"><BookOpen className="w-3 h-3 mr-1 text-accent" /> Resources:</p>
+            <ul className="list-disc list-inside pl-2">
+              {data.resources.slice(0, 2).map((res:string, i:number) => <li key={i} className="truncate">{res}</li>)}
+            </ul>
           </div>
         )}
       </CardContent>
@@ -86,80 +96,89 @@ const CustomNode = ({ data }: { data: any }) => {
 const nodeTypes = { custom: CustomNode };
 
 const RoadmapFlow = ({ roadmap, analysisResult }: { roadmap: CareerRoadmapOutput, analysisResult: AnalyzeResumeOutput | null }) => {
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<ReactFlowNode[]>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<ReactFlowEdge[]>([]);
   const reactFlowWrapperRef = useRef<HTMLDivElement>(null);
 
-
-  React.useEffect(() => {
-    if (roadmap && roadmap.steps) {
-      const initialNodes: Node[] = roadmap.steps.map((step, index) => {
-        const coverage = calculateSkillCoverage(analysisResult?.skills, step.keySkillsToDevelop);
-        let coverageStatus = 'new';
-        if (coverage >= 75) coverageStatus = 'covered';
-        else if (coverage >= 25) coverageStatus = 'partial';
-
-        return {
-          id: `step-${index}`,
-          type: 'custom',
-          data: { 
-            label: step.title, 
-            description: step.description,
-            skills: step.keySkillsToDevelop,
-            timeline: step.estimatedTimeline,
-            resources: step.resources,
-            coverageStatus: coverageStatus,
-          },
-          position: { x: 0, y: index * 200 }, 
-        };
+  useEffect(() => {
+    if (roadmap && roadmap.nodes && roadmap.edges) {
+      const stageOrder: RoadmapNode['stage'][] = ["Fundamentals", "Core Skills", "Advanced Topics", "Optional/Nice-to-Have"];
+      const nodesByStage: Record<string, RoadmapNode[]> = {};
+      roadmap.nodes.forEach(node => {
+        if (!nodesByStage[node.stage]) {
+          nodesByStage[node.stage] = [];
+        }
+        nodesByStage[node.stage].push(node);
       });
 
-      const initialEdges: Edge[] = roadmap.steps.slice(0, -1).map((_, index) => ({
-        id: `edge-${index}-${index + 1}`,
-        source: `step-${index}`,
-        target: `step-${index + 1}`,
+      const xSpacing = 320; // Horizontal space between nodes
+      const ySpacing = 230; // Vertical space between stages / node rows
+      const nodesPerRow = 2; // Max nodes per row within a stage visualization
+
+      const reactFlowNodes: ReactFlowNode[] = [];
+      let currentGlobalY = 50; // Initial Y offset
+
+      stageOrder.forEach(stageName => {
+        const stageNodes = nodesByStage[stageName];
+        if (stageNodes && stageNodes.length > 0) {
+          let stageMaxRows = 0;
+          stageNodes.forEach((node, index) => {
+            const isCovered = analysisResult?.skills?.some(s => s.toLowerCase().trim() === node.label.toLowerCase().trim()) ?? false;
+            const coverageStatus = isCovered ? 'covered' : 'new';
+            
+            const rowIndex = Math.floor(index / nodesPerRow);
+            const colIndex = index % nodesPerRow;
+            stageMaxRows = Math.max(stageMaxRows, rowIndex + 1);
+
+            reactFlowNodes.push({
+              id: node.id,
+              type: 'custom',
+              data: {
+                ...node, // Includes id, label, stage, description, resources
+                coverageStatus: coverageStatus,
+              },
+              position: {
+                x: colIndex * xSpacing + (rowIndex % 2 === 1 ? xSpacing / 3 : 0), // Stagger odd rows slightly
+                y: currentGlobalY + rowIndex * (ySpacing * 0.75),
+              },
+              sourcePosition: Position.Right,
+              targetPosition: Position.Left,
+            });
+          });
+          currentGlobalY += stageMaxRows * (ySpacing * 0.75) + ySpacing * 0.5; // Move to next stage Y
+        }
+      });
+      setNodes(reactFlowNodes);
+
+      const reactFlowEdges: ReactFlowEdge[] = roadmap.edges.map(edge => ({
+        id: `edge-${edge.source}-${edge.target}`,
+        source: edge.source,
+        target: edge.target,
+        label: edge.label,
         type: 'smoothstep',
         markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(var(--primary))' },
-        style: { stroke: 'hsl(var(--primary))', strokeWidth: 2 },
+        style: { stroke: 'hsl(var(--primary))', strokeWidth: 1.5 },
+        labelStyle: { fontSize: '10px', fill: 'hsl(var(--muted-foreground))' },
+        labelBgStyle: { fill: 'hsl(var(--background))', fillOpacity: 0.7 },
+        labelBgPadding: [4, 2],
+        labelBgBorderRadius: 2,
       }));
-      
-      setNodes(initialNodes);
-      setEdges(initialEdges);
+      setEdges(reactFlowEdges);
     }
   }, [roadmap, analysisResult, setNodes, setEdges]);
 
   const onConnect = useCallback(
-    (params: Edge) => setEdges((eds) => addEdge(params, eds)),
+    (params: ReactFlowEdge) => setEdges((eds) => addEdge(params, eds)),
     [setEdges]
   );
   
   const handleDownloadImage = useCallback(async () => {
-    const viewportElement = reactFlowWrapperRef.current?.querySelector('.react-flow__viewport') as HTMLElement;
-
-    if (viewportElement && reactFlowWrapperRef.current) {
-        // Temporarily adjust wrapper for full capture if elements are outside viewport bounds
-        // This is a common issue with html2canvas if content overflows
-        const originalStyle = {
-            overflow: reactFlowWrapperRef.current.style.overflow,
-            height: reactFlowWrapperRef.current.style.height,
-            width: reactFlowWrapperRef.current.style.width,
-        };
-        // Ensure all content is visible for canvas capture
-        // reactFlowWrapperRef.current.style.overflow = 'visible';
-        // reactFlowWrapperRef.current.style.height = 'auto'; 
-        // reactFlowWrapperRef.current.style.width = 'auto';
-
+    if (reactFlowWrapperRef.current) {
       try {
-        const canvas = await html2canvas(reactFlowWrapperRef.current, { // Capture the whole wrapper
+        const canvas = await html2canvas(reactFlowWrapperRef.current, {
           useCORS: true,
           logging: false,
-          // width: viewportElement.scrollWidth, // Try to get full content width
-          // height: viewportElement.scrollHeight, // Try to get full content height
-          // windowWidth: viewportElement.scrollWidth,
-          // windowHeight: viewportElement.scrollHeight,
-          scrollX: - viewportElement.scrollLeft, //Account for scroll
-          scrollY: - viewportElement.scrollTop,
-          
+          backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--background').trim() || '#ffffff', // Use theme background
         });
         const dataUrl = canvas.toDataURL('image/png');
         const a = document.createElement("a");
@@ -170,20 +189,13 @@ const RoadmapFlow = ({ roadmap, analysisResult }: { roadmap: CareerRoadmapOutput
         document.body.removeChild(a);
       } catch (err) {
         console.error("Failed to download image using html2canvas", err);
-      } finally {
-         // Restore original styles
-        // reactFlowWrapperRef.current.style.overflow = originalStyle.overflow;
-        // reactFlowWrapperRef.current.style.height = originalStyle.height;
-        // reactFlowWrapperRef.current.style.width = originalStyle.width;
       }
-    } else {
-      console.error("React Flow wrapper or viewport element not found for image export.");
     }
   }, []);
 
 
   return (
-    <div ref={reactFlowWrapperRef} style={{ height: '600px', width: '100%' }} className="mt-6 border rounded-lg shadow-inner bg-muted/20 overflow-hidden">
+    <div ref={reactFlowWrapperRef} style={{ height: '700px', width: '100%' }} className="mt-6 border rounded-lg shadow-inner bg-muted/20 overflow-hidden">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -192,6 +204,7 @@ const RoadmapFlow = ({ roadmap, analysisResult }: { roadmap: CareerRoadmapOutput
         onConnect={onConnect}
         nodeTypes={nodeTypes}
         fitView
+        fitViewOptions={{ padding: 0.2 }}
         attributionPosition="bottom-left"
         className="rounded-lg"
       >
@@ -251,9 +264,17 @@ export function CareerRoadmapDisplay({ analysisResult }: CareerRoadmapDisplayPro
     try {
       const currentRole = analysisResult.experience?.split('\n')[0]?.split(' at ')[0] || "current profile";
       const result = await generateCareerRoadmap({
-        resumeAnalysis: analysisResult,
+        resumeAnalysis: { // Pass only necessary fields
+            name: analysisResult.name,
+            skills: analysisResult.skills,
+            experience: analysisResult.experience,
+            education: analysisResult.education,
+            projects: analysisResult.projects,
+            language: analysisResult.language
+        },
         currentRole: currentRole,
         targetRole: targetRole,
+        useRoadmapSHStructure: true, // Ensure this is passed
       });
       setRoadmap(result);
     } catch (err) {
@@ -277,7 +298,7 @@ export function CareerRoadmapDisplay({ analysisResult }: CareerRoadmapDisplayPro
           </span>
           <div>
             <CardTitle className="text-2xl font-bold text-primary">Career Roadmap Generator</CardTitle>
-            <CardDescription>Enter your target role to get a personalized step-by-step visual plan, inspired by <a href="https://roadmap.sh" target="_blank" rel="noopener noreferrer" className="underline hover:text-accent">roadmap.sh</a>.</CardDescription>
+            <CardDescription>Enter your target role to get a personalized step-by-step visual plan. The graph shows learning dependencies and considers structures from roadmap.sh.</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -338,8 +359,9 @@ export function CareerRoadmapDisplay({ analysisResult }: CareerRoadmapDisplayPro
                 <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 <AlertTitle className="font-semibold text-blue-800 dark:text-blue-200">Roadmap Disclaimer</AlertTitle>
                 <AlertDescription className="text-sm">
-                    This visual roadmap is AI-generated based on common career paths (inspired by sites like roadmap.sh) and your resume. It's a guide, not a guarantee.
-                    Always research specific job requirements and adapt your plan as you learn and grow. Node colors indicate skill coverage: Green (Covered), Yellow (Partial), Grey (New).
+                    This visual roadmap is AI-generated based on common career paths (including structures similar to those on roadmap.sh) and your resume. It's a guide, not a guarantee.
+                    Node border colors indicate skill coverage: Green (Covered based on resume), Stage-specific color (New skill).
+                    Always research specific job requirements and adapt your plan as you learn and grow.
                 </AlertDescription>
             </Alert>
           </div>
@@ -348,4 +370,3 @@ export function CareerRoadmapDisplay({ analysisResult }: CareerRoadmapDisplayPro
     </Card>
   );
 }
-

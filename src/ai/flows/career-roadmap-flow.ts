@@ -1,11 +1,16 @@
 // src/ai/flows/career-roadmap-flow.ts
 'use server';
 /**
- * @fileOverview Generates a career roadmap based on resume analysis and a target role.
+ * @fileOverview Generates a career roadmap in a graph format based on resume analysis and a target role.
+ * The output is structured as nodes (skills, concepts, tools) and edges (dependencies),
+ * suitable for rendering with graph libraries like react-flow.
+ * It also integrates with roadmap.sh by instructing the LLM to consider its structure.
  *
  * - generateCareerRoadmap - A function that handles the career roadmap generation.
  * - CareerRoadmapInput - The input type for the function.
  * - CareerRoadmapOutput - The return type for the function.
+ * - RoadmapNode - The type for a node in the career roadmap graph.
+ * - RoadmapEdge - The type for an edge in the career roadmap graph.
  */
 
 import { ai } from '@/ai/genkit';
@@ -15,7 +20,7 @@ import { z } from 'genkit';
 const ResumeAnalysisSchemaForRoadmap = z.object({
   name: z.string().optional(),
   skills: z.array(z.string()).optional(),
-  experience: z.string().optional(),
+  experience: z.string().optional(), // Summary of experience
   education: z.string().optional(),
   projects: z.array(z.string()).optional(),
   language: z.string().optional(),
@@ -24,28 +29,37 @@ const ResumeAnalysisSchemaForRoadmap = z.object({
 const CareerRoadmapInputSchema = z.object({
   resumeAnalysis: ResumeAnalysisSchemaForRoadmap.describe("The analyzed data from the user's resume."),
   currentRole: z.string().optional().describe("The user's current role, if any, extracted from the resume or explicitly stated."),
-  targetRole: z.string().describe("The user's desired target role."),
+  targetRole: z.string().describe("The user's desired target role (e.g., 'Frontend Developer', 'DevOps Engineer')."),
+  useRoadmapSHStructure: z.boolean().optional().default(true).describe("Whether to base the roadmap structure on common patterns found on roadmap.sh for the given role."),
 });
 export type CareerRoadmapInput = z.infer<typeof CareerRoadmapInputSchema>;
 
-const RoadmapStepSchema = z.object({
-  title: z.string().describe("A concise title for this step in the roadmap."),
-  description: z.string().describe("A detailed description of what this step entails (e.g., skills to learn, type of experience to gain, key concepts to understand). This should be broken down if complex."),
-  estimatedTimeline: z.string().describe("An estimated timeline to complete this step (e.g., '3-6 months', '1 year', 'Ongoing')."),
-  resources: z.array(z.string()).optional().describe("A list of suggested resources (e.g., specific course types, books, platforms, communities, tools to master)."),
-  keySkillsToDevelop: z.array(z.string()).optional().describe("Specific skills to focus on during this step."),
+const RoadmapNodeSchema = z.object({
+  id: z.string().describe("A unique, slug-like identifier for the node (e.g., 'html', 'javascript_basics', 'cicd_pipelines')."),
+  label: z.string().describe("The display name of the skill, concept, or tool (e.g., 'HTML', 'JavaScript Basics', 'CI/CD Pipelines')."),
+  stage: z.enum(["Fundamentals", "Core Skills", "Advanced Topics", "Optional/Nice-to-Have"]).describe("The learning stage this node belongs to."),
+  description: z.string().optional().describe("A brief description of what this node/skill entails, why it's important for the target role, and key learning objectives. This should be concise but informative."),
+  resources: z.array(z.string()).optional().describe("A list of 1-2 specific and actionable learning resource suggestions (e.g., 'MDN Web Docs for HTML syntax', 'FreeCodeCamp course on Responsive Web Design', 'Official React documentation tutorial'). Keep suggestions brief."),
 });
+export type RoadmapNode = z.infer<typeof RoadmapNodeSchema>;
+
+const RoadmapEdgeSchema = z.object({
+  source: z.string().describe("The 'id' of the source/prerequisite node."),
+  target: z.string().describe("The 'id' of the target/dependent node."),
+  label: z.string().optional().describe("An optional short label for the edge describing the dependency (e.g., 'builds upon', 'requires understanding of')."),
+});
+export type RoadmapEdge = z.infer<typeof RoadmapEdgeSchema>;
 
 const CareerRoadmapOutputSchema = z.object({
-  introduction: z.string().describe("A brief introduction to the roadmap, acknowledging the current state and target role."),
-  steps: z.array(RoadmapStepSchema).describe("A list of actionable steps to reach the target role. These steps should be structured and detailed, inspired by resources like roadmap.sh."),
-  potentialCertifications: z.array(z.string()).optional().describe("A list of relevant certifications for the target role."),
-  projectIdeas: z.array(z.string()).optional().describe("A list of project ideas to build a portfolio for the target role."),
-  estimatedSalaryRange: z.string().optional().describe("An estimated salary range for the target role in a general market (e.g., '$X - $Y per year'). Specify if it's region-specific if possible."),
+  introduction: z.string().describe("A brief introduction to the roadmap, acknowledging the user's aspiration for the target role."),
+  nodes: z.array(RoadmapNodeSchema).describe("A list of 20-40 nodes representing skills, concepts, or tools, depending on role complexity. Each node must have an id, label, stage, and optionally a description and resources."),
+  edges: z.array(RoadmapEdgeSchema).describe("A list of directed edges showing learning dependencies between nodes. Each edge must have a source and target id."),
+  potentialCertifications: z.array(z.string()).optional().describe("A list of 2-3 relevant certifications for the target role."),
+  projectIdeas: z.array(z.string()).optional().describe("A list of 2-3 project ideas to build a portfolio relevant to the target role."),
+  estimatedSalaryRange: z.string().optional().describe("An estimated general salary range for the target role (e.g., '$X - $Y per year')."),
   closingMotivation: z.string().describe("A brief motivational closing statement."),
 });
 export type CareerRoadmapOutput = z.infer<typeof CareerRoadmapOutputSchema>;
-export type RoadmapStep = z.infer<typeof RoadmapStepSchema>;
 
 
 export async function generateCareerRoadmap(input: CareerRoadmapInput): Promise<CareerRoadmapOutput> {
@@ -56,35 +70,59 @@ const careerRoadmapPrompt = ai.definePrompt({
   name: 'careerRoadmapPrompt',
   input: { schema: CareerRoadmapInputSchema },
   output: { schema: CareerRoadmapOutputSchema },
-  prompt: `You are an expert AI career planning advisor and strategist.
-The user has provided their resume analysis and a target career role.
-Your task is to generate a comprehensive, step-by-step career roadmap to help them transition from their current situation (based on their resume) to their target role.
-Structure the roadmap steps in a detailed and organized manner, similar to the style found on websites like roadmap.sh. This means each step should clearly outline what needs to be learned or achieved, why it's important, and potential resources or methods.
+  prompt: `You are an expert AI career coach and strategist. Your task is to generate a detailed career roadmap in a graph format for a user aspiring to the role of '{{{targetRole}}}', considering their current resume profile.
+{{#if useRoadmapSHStructure}}
+Consider the typical structure and content found on roadmap.sh for the '{{{targetRole}}}' when designing the learning path, but ensure the output is personalized and adheres to the schema below.
+{{/if}}
 
-Resume Analysis Summary:
+Resume Analysis Summary (for context):
 Skills: {{#if resumeAnalysis.skills}}{{#each resumeAnalysis.skills}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}Not specified{{/if}}
 Experience Summary: {{resumeAnalysis.experience}}
-Education: {{resumeAnalysis.education}}
-
 {{#if currentRole}}Current Role (deduced or stated): {{{currentRole}}}{{/if}}
-Target Role: {{{targetRole}}}
 
-Please generate the roadmap with the following sections, ensuring the 'steps' are particularly detailed:
-1.  Introduction: Briefly acknowledge the user's current standing (based on resume) and their aspiration for the target role.
-2.  Steps: Create a list of detailed, logically sequenced actionable steps (typically 5-10, depending on complexity). Each step should represent a significant milestone or learning area. If a step itself is very broad, break it down in its description or suggest it could be multiple smaller efforts. Each step should include:
-    *   title: A concise title for the step (e.g., "Foundational Python and Data Structures").
-    *   description: Detailed actions, core concepts to understand, skills to acquire, or experiences to gain. Explain *why* these are important for the progression.
-    *   keySkillsToDevelop: (Optional) A list of 3-5 specific skills to focus on during this step (e.g., "Python", "SQL", "Pandas", "Algorithms").
-    *   estimatedTimeline: A realistic timeline for the step (e.g., "3-6 months", "Ongoing").
-    *   resources: (Optional) Suggest types of resources like "Online courses on AI/ML (e.g., Coursera's Deep Learning Specialization)", "Interactive coding platforms (e.g., LeetCode for algorithms)", "Key books (e.g., 'Python for Data Analysis')", "Relevant communities (e.g., Kaggle for data science projects)", "Open-source contributions to specific types of projects".
-3.  Potential Certifications: List 2-3 relevant certifications that would be beneficial for the target role.
-4.  Project Ideas: Suggest 2-3 project ideas that would help build a strong portfolio for the target role. These should be practical and showcase learned skills.
-5.  Estimated Salary Range: Provide a general estimated annual salary range for the target role. You can specify a common market like the US or India, or state it's a general estimate.
-6.  Closing Motivation: A short, encouraging message.
+Generate the roadmap as a JSON object adhering strictly to the output schema. The roadmap should consist of:
+1.  **Introduction**: A brief, encouraging intro for the user's journey towards '{{{targetRole}}}'.
+2.  **Nodes**: An array of 20-40 nodes (depending on the complexity of '{{{targetRole}}}'). Each node represents a skill, concept, or tool.
+    *   Each node MUST have:
+        *   'id': A unique, simple, slug-like string (e.g., 'git_basics', 'api_design').
+        *   'label': A human-readable name (e.g., 'Git Basics', 'API Design Principles').
+        *   'stage': One of "Fundamentals", "Core Skills", "Advanced Topics", "Optional/Nice-to-Have".
+        *   'description' (optional but highly recommended): A concise explanation of the item and its relevance.
+        *   'resources' (optional but highly recommended): 1-2 brief, specific suggestions for learning resources (e.g., "Book: 'Clean Code'", "Platform: LeetCode for problem-solving").
+3.  **Edges**: An array of directed edges showing learning dependencies (e.g., learn HTML before CSS).
+    *   Each edge MUST have:
+        *   'source': The 'id' of the prerequisite node.
+        *   'target': The 'id' of the dependent node.
+        *   'label' (optional): A short phrase for the dependency (e.g., 'foundational for').
+4.  **Potential Certifications**: 2-3 relevant certifications.
+5.  **Project Ideas**: 2-3 project ideas to build a portfolio.
+6.  **Estimated Salary Range**: A general estimate for '{{{targetRole}}}'.
+7.  **Closing Motivation**: A short, encouraging message.
 
-Focus on providing practical, actionable advice. If the resume indicates a beginner level and the target role is advanced, the steps should reflect a realistic progression.
-If the target role is very different from the current experience, acknowledge the need for foundational learning.
-Ensure the output strictly adheres to the JSON schema. The detail in the 'steps' (description, keySkillsToDevelop, resources) is critical for making the roadmap useful and actionable, similar to the guidance on roadmap.sh.
+Important:
+-   The graph should represent a logical learning path towards becoming proficient in '{{{targetRole}}}'.
+-   Ensure all node 'id's used in 'edges' actually exist in the 'nodes' array.
+-   Structure the 'nodes' and 'edges' to be suitable for rendering with a graph library like react-flow.
+-   The number of nodes should be between 20 and 40. For very complex roles, lean towards the higher end. For simpler transitions, the lower end.
+-   Node descriptions and resource suggestions should be practical and concise.
+-   If referencing roadmap.sh structure, adapt it to fit this JSON format and personalize based on the resume.
+
+Example Node:
+{
+  "id": "restful_apis",
+  "label": "RESTful APIs",
+  "stage": "Core Skills",
+  "description": "Understand principles of REST, HTTP methods, and how to design and consume APIs. Essential for web communication.",
+  "resources": ["Book: 'APIs: A Strategy Guide'", "Tutorial: 'Build a REST API with Node.js on YouTube'"]
+}
+Example Edge:
+{
+  "source": "javascript_basics",
+  "target": "react_framework",
+  "label": "prerequisite for"
+}
+
+Produce the ENTIRE output as a single JSON object strictly matching the defined schema.
 `,
 });
 
@@ -96,18 +134,26 @@ const careerRoadmapFlow = ai.defineFlow(
   },
   async (input) => {
     const { output } = await careerRoadmapPrompt(input);
-    // Ensure steps array exists
-    if (output && !output.steps) {
-        output.steps = [];
+    
+    // Ensure nodes and edges arrays exist and are well-formed
+    if (output) {
+      output.nodes = output.nodes || [];
+      output.edges = output.edges || [];
+      output.potentialCertifications = output.potentialCertifications || [];
+      output.projectIdeas = output.projectIdeas || [];
+
+      output.nodes = output.nodes.map(node => ({
+        ...node,
+        description: node.description || `Learn about ${node.label}.`, // Default description
+        resources: node.resources || [], // Ensure resources is always an array
+      }));
+
+      // Validate edges (simple check: source/target exist)
+      const nodeIds = new Set(output.nodes.map(n => n.id));
+      output.edges = output.edges.filter(edge => nodeIds.has(edge.source) && nodeIds.has(edge.target));
+
     }
-    // Ensure keySkillsToDevelop and resources are arrays within each step
-    if (output && output.steps) {
-        output.steps = output.steps.map(step => ({
-            ...step,
-            keySkillsToDevelop: step.keySkillsToDevelop || [],
-            resources: step.resources || [],
-        }));
-    }
+    
     return output!;
   }
 );
