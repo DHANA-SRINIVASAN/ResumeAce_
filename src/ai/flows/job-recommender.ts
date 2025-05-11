@@ -25,14 +25,14 @@ const RecommendedJobSchemaRequired = z.object({
   location: z.string().optional().describe('The job location. Prioritize locations in India like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy if applicable, or as indicated by resume.'),
   keyRequiredSkills: z.array(z.string()).describe('A list of 3-5 key skills required for the job, directly from the job posting if possible. This field is mandatory.'),
   description: z.string().describe('A short job description (2-3 sentences) summarizing the role and its key responsibilities. This field is mandatory.'),
-  applicationLink: z.string().url().describe('A direct application link for the job, preferably from LinkedIn, Indeed, or SimplyHired. This field is mandatory.'),
+  applicationLink: z.string().describe('A direct application link for the job, preferably from LinkedIn, Indeed, Naukri, or SimplyHired. This field is mandatory.'),
   matchScore: z.number().min(0).max(100).describe('A score from 0 to 100 indicating how well the job aligns with the candidate’s skills and experience. This field is mandatory.'),
 });
 const RecommendedJobSchemaLax = RecommendedJobSchemaRequired.partial();
 
 
 const JobRecommenderOutputSchema = z.object({
-  jobs: z.array(RecommendedJobSchemaRequired).min(5).max(10).describe('A list of 5-10 recommended jobs. Prioritize jobs that closely match the candidate’s most recent experience and top skills. Locations in India like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy should be considered if relevant.'),
+  jobs: z.array(RecommendedJobSchemaRequired).min(5).max(10).describe('A list of 5-10 recommended jobs. Prioritize jobs that closely match the candidate’s most recent experience and top skills. Locations in India like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy should be considered if relevant. Match score should be 50% or higher for inclusion.'),
 });
 export type JobRecommenderOutput = z.infer<typeof JobRecommenderOutputSchema>;
 export type RecommendedJob = z.infer<typeof RecommendedJobSchemaRequired>;
@@ -47,7 +47,7 @@ const jobRecommenderPrompt = ai.definePrompt({
   input: {schema: JobRecommenderInputSchema},
   output: {schema: z.object({jobs: z.array(RecommendedJobSchemaLax)})}, 
   prompt: `You are an expert AI career advisor and job recommender.
-Analyze the candidate's resume details (skills, most recent experience, projects). Based on this, recommend 5-10 relevant job openings. Prioritize jobs that closely match the candidate’s most recent experience and top skills.
+Analyze the candidate's resume details (skills, most recent experience, projects). Based on this, recommend 5-10 relevant job openings. Prioritize jobs that closely match the candidate’s most recent experience and top skills, and have a match score of 50% or higher.
 Prioritize jobs located in India, specifically in cities like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy, if these align with the profile or are generally suitable.
 
 For each job recommendation, you MUST provide:
@@ -56,8 +56,8 @@ For each job recommendation, you MUST provide:
 3.  **Location**: (e.g., "Chennai, India", "Remote"). This field is mandatory.
 4.  **Key Required Skills**: A list of 3-5 key skills explicitly mentioned in the job requirements (e.g., ["Python", "SQL", "AWS"]). This field is mandatory.
 5.  **Short Job Description**: A concise summary (2-3 sentences) of the job's main responsibilities and purpose. This field is mandatory.
-6.  **Application Link**: A direct, functional URL to the job application page, preferably from LinkedIn, Indeed, or SimplyHired. This field is mandatory and must be a valid URL.
-7.  **Match Score**: A percentage (0-100) representing the alignment of the job with the candidate's skills and experience (especially recent experience). This field is mandatory.
+6.  **Application Link**: A direct, functional URL to the job application page, preferably from LinkedIn, Indeed, Naukri, or SimplyHired. This field is mandatory and must be a valid URL.
+7.  **Match Score**: A percentage (0-100) representing the alignment of the job with the candidate's skills and experience (especially recent experience). This field is mandatory. Ensure this score is 50 or higher.
 
 Resume Details:
 Top Skills: {{#if skills}}{{#each skills}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}No specific skills listed.{{/if}}
@@ -72,9 +72,9 @@ Projects Summary (if relevant):
 User's Stated Target Role (consider this but prioritize resume content): {{{targetRole}}}
 {{/if}}
 
-Focus on providing high-quality, actionable recommendations. Ensure all fields are populated correctly. If a suitable application link from LinkedIn, Indeed, or SimplyHired cannot be found, you may use a general careers page link for the company if a specific role matching the description is likely listed there, but prioritize direct job links.
+Focus on providing high-quality, actionable recommendations. Ensure all fields are populated correctly. If a suitable application link from LinkedIn, Indeed, Naukri, or SimplyHired cannot be found, you may use a general careers page link for the company if a specific role matching the description is likely listed there, but prioritize direct job links.
 The 'keyRequiredSkills' should be derived from typical requirements for such a role if not explicitly available for a general link.
-Output strictly in the defined JSON schema. Only include jobs if you can provide all mandatory fields.
+Output strictly in the defined JSON schema. Only include jobs if you can provide all mandatory fields and the match score is 50% or higher.
 Include 5-10 jobs.
 `,
 });
@@ -126,14 +126,29 @@ const jobRecommenderFlow = ai.defineFlow(
       
       let applicationLink = (currentJob.applicationLink && currentJob.applicationLink.trim() !== "") ? currentJob.applicationLink.trim() : `https://www.google.com/search?q=${encodeURIComponent(title + " " + company + " " + location)}`;
       try {
-        new URL(applicationLink); // Validate URL
+        // Basic check if it looks like a URL, actual validation is harder without external libs or more complex regex
+        if (!applicationLink.startsWith('http://') && !applicationLink.startsWith('https://')) {
+            // Attempt to fix by prepending https:// if it's a common domain
+            if (applicationLink.includes('.')) { // Simple check for a domain
+                applicationLink = 'https://' + applicationLink;
+            } else {
+                 throw new Error("Invalid URL format, cannot auto-correct.");
+            }
+        }
+        new URL(applicationLink); 
       } catch (_) {
-        console.warn(`JobRecommenderFlow: Invalid applicationLink URL "${applicationLink}" for job "${title}". Defaulting to Google search.`);
+        console.warn(`JobRecommenderFlow: Invalid applicationLink "${applicationLink}" for job "${title}". Defaulting to Google search.`);
         applicationLink = `https://www.google.com/search?q=${encodeURIComponent(title + " " + company + " " + location)}`;
       }
       
       const matchScore = (typeof currentJob.matchScore === 'number' && currentJob.matchScore >= 0 && currentJob.matchScore <= 100) ? currentJob.matchScore : 0;
       
+      // Ensure match score is 50% or higher as per new requirement
+      if (matchScore < 50) {
+        console.warn(`JobRecommenderFlow: Skipping job "${title}" due to match score ${matchScore} < 50.`);
+        continue;
+      }
+
       processedJobs.push({
         title,
         company,
@@ -145,10 +160,8 @@ const jobRecommenderFlow = ai.defineFlow(
       });
     }
     
-    // Ensure between 5 and 10 jobs, even if it means truncating or padding (though padding isn't done here, relying on prompt)
+    // Ensure between 5 and 10 jobs, even if it means truncating.
     const finalJobs = processedJobs.slice(0, 10); 
-    // If LLM returns fewer than 5, it will be less, but prompt aims for 5-10.
-    // We could add logic to ensure minimum 5, but that might involve re-query or complex filling.
 
     return { jobs: finalJobs };
   }
