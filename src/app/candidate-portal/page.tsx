@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
+import { AuthGuard } from '@/components/auth-guard'; // Import AuthGuard
 import { ResumeUploadForm } from '@/components/resume-upload-form';
 import { AnalysisResultsDisplay } from '@/components/analysis-results-display';
 import { ScoreFeedbackDisplay } from '@/components/score-feedback-display';
@@ -16,14 +16,13 @@ import { LoadingIndicator } from '@/components/loading-indicator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { analyzeResume, type AnalyzeResumeOutput } from '@/ai/flows/resume-analyzer';
 import { analyzeResumeAndScore, type AnalyzeResumeAndScoreOutput } from '@/ai/flows/resume-score';
-import { getJobRecommendations, type JobRecommenderOutput, type RecommendedJob } from '@/ai/flows/job-recommender';
+import { getJobRecommendations, type JobRecommenderOutput } from '@/ai/flows/job-recommender';
 import { fileToDataUri } from '@/lib/file-utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, FileText, Sparkles, Target, Bot, MapPinned, Filter, BookOpen, Layers } from 'lucide-react';
+import { BarChart, FileText, Sparkles, Target, Bot, MapPinned, Filter, BookOpen } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-
-export default function CandidatePortalPage() {
+function CandidatePortalContent() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalyzeResumeOutput | null>(null);
   const [scoreResult, setScoreResult] = useState<AnalyzeResumeAndScoreOutput | null>(null);
@@ -32,11 +31,8 @@ export default function CandidatePortalPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentStage, setCurrentStage] = useState<string>("");
   const [activeTab, setActiveTab] = useState("analysis");
-  
   const [derivedTargetRole, setDerivedTargetRole] = useState<string | undefined>(undefined);
 
-
-  // Effect to clear results when file is removed
   useEffect(() => {
     if (!uploadedFile) {
       setAnalysisResult(null);
@@ -55,25 +51,18 @@ export default function CandidatePortalPage() {
     setScoreResult(null);
     setJobRecommendations(null);
     setUploadedFile(file);
-    setActiveTab("analysis"); // Reset to analysis tab on new upload
+    setActiveTab("analysis");
     setDerivedTargetRole(undefined);
-
-
-    const analysisSteps = [];
 
     try {
       setCurrentStage("Converting file...");
       const resumeDataUri = await fileToDataUri(file);
-      analysisSteps.push({ stage: "File Conversion", status: "Completed" });
 
       setCurrentStage("Parsing resume with AI...");
       const analysis = await analyzeResume({ resumeDataUri });
       setAnalysisResult(analysis);
-      analysisSteps.push({ stage: "AI Resume Parsing", status: "Completed" });
-
 
       setCurrentStage("Scoring resume...");
-      // Construct a comprehensive text for scoring
       const resumeTextForScoring = `
         Name: ${analysis.name || 'N/A'}
         Contact: ${analysis.contactDetails || 'N/A'}
@@ -86,8 +75,6 @@ export default function CandidatePortalPage() {
       
       const scoreData = await analyzeResumeAndScore({ resumeText: resumeTextForScoring });
       setScoreResult(scoreData);
-      analysisSteps.push({ stage: "Resume Scoring", status: "Completed" });
-
 
       if (scoreData.score >= 30) { 
         setCurrentStage("Fetching job recommendations...");
@@ -105,38 +92,27 @@ export default function CandidatePortalPage() {
             }
         }
         
-        const inputForJobRecs: {
-            skills: string[];
-            experienceSummary: string;
-            projectsSummary?: string[];
-            targetRole?: string;
-        } = {
+        const inputForJobRecs = {
           skills: analysis.skills || [],
           experienceSummary: analysis.experience || "",
           projectsSummary: analysis.projects,
           targetRole: inferredTargetRole,
         };
 
-
         const jobRecs = await getJobRecommendations(inputForJobRecs);
         setJobRecommendations(jobRecs);
-        analysisSteps.push({ stage: "Job Recommendations", status: "Completed" });
       } else {
-         setJobRecommendations({jobs: []}); // Ensure jobRecommendations is not null
-         analysisSteps.push({ stage: "Job Recommendations", status: `Skipped (Score < 30)` });
+         setJobRecommendations({jobs: []});
       }
 
     } catch (err) {
       console.error("Error during resume processing:", err);
-      const failedStep = analysisSteps.find(step => step.stage === currentStage) || {stage: currentStage, status: "Failed"};
-      setError(`Error during ${failedStep.stage}: ${err instanceof Error ? err.message : "An unknown error occurred."}`);
-      analysisSteps.push({ stage: currentStage, status: `Failed - ${err instanceof Error ? err.message : "Unknown"}` });
+      setError(`Error during ${currentStage}: ${err instanceof Error ? err.message : "An unknown error occurred."}`);
     } finally {
       setIsProcessing(false);
       setCurrentStage("");
     }
-  }, []);
-
+  }, [currentStage]); // Added currentStage to dependency array
 
   const renderContent = () => {
     if (isProcessing) {
@@ -185,7 +161,6 @@ export default function CandidatePortalPage() {
         );
     }
 
-    // If analysis is complete, show tabs
     return (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-6 mb-6">
@@ -242,10 +217,9 @@ export default function CandidatePortalPage() {
     );
   };
 
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-secondary/30">
-      <div className="container mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-background to-secondary/30 py-8">
+      <div className="container mx-auto px-4">
         <header className="text-center mb-12 pt-8">
           <div className="inline-flex items-center justify-center bg-primary text-primary-foreground p-3 rounded-lg shadow-lg mb-4">
             <Sparkles className="w-10 h-10" />
@@ -297,5 +271,13 @@ export default function CandidatePortalPage() {
         </footer>
       </div>
     </div>
+  );
+}
+
+export default function CandidatePortalPage() {
+  return (
+    <AuthGuard>
+      <CandidatePortalContent />
+    </AuthGuard>
   );
 }

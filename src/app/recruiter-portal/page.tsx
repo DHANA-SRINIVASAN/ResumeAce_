@@ -3,6 +3,7 @@
 
 import React, { useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import { AuthGuard } from '@/components/auth-guard'; // Import AuthGuard
 import { ArrowLeft, UploadCloud, FileText as FileTextIcon, Edit3, CheckCircle, XCircle, BookOpen, Target, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,10 +11,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { LoadingIndicator } from '@/components/loading-indicator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { fileToDataUri } from '@/lib/file-utils';
-import { matchResumeToJd, type RecruiterMatchInput, type RecruiterMatchOutput, type RecommendedCourse } from '@/ai/flows/recruiter-matcher-flow';
+import { matchResumeToJd, type RecruiterMatchInput, type RecruiterMatchOutput } from '@/ai/flows/recruiter-matcher-flow';
 import { cn } from '@/lib/utils';
 
 const acceptedFileTypes: Record<string, string[]> = {
@@ -24,7 +24,7 @@ const acceptedFileTypes: Record<string, string[]> = {
 };
 const acceptedFileExtensions = Object.values(acceptedFileTypes).flat().join(',');
 
-export default function RecruiterPortalPage() {
+function RecruiterPortalContent() {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [jobDescription, setJobDescription] = useState<string>('');
   const [matchResult, setMatchResult] = useState<RecruiterMatchOutput | null>(null);
@@ -84,7 +84,6 @@ export default function RecruiterPortalPage() {
     if(resumeInputRef.current) resumeInputRef.current.value = "";
   }, []);
 
-
   const handleSubmit = async () => {
     if (!resumeFile || !jobDescription.trim()) {
       setError("Please upload a resume and provide a job description.");
@@ -123,20 +122,16 @@ export default function RecruiterPortalPage() {
   };
   
   const getAssessmentBadgeVariant = (assessment: string): "default" | "secondary" | "destructive" | "outline" => {
-    if (assessment.toLowerCase().includes("excellent") || assessment.toLowerCase().includes("strong")) return "default"; // Default is primary
+    if (assessment.toLowerCase().includes("excellent") || assessment.toLowerCase().includes("strong")) return "default";
     if (assessment.toLowerCase().includes("good") || assessment.toLowerCase().includes("fair")) return "secondary";
     return "destructive";
   };
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-secondary/30 py-8">
       <div className="container mx-auto px-4">
         <header className="mb-12">
-          <Link href="/" className="inline-flex items-center text-primary hover:underline mb-6 text-sm">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Candidate Portal
-          </Link>
+           {/* Removed back to candidate portal link, handled by main sidebar nav */}
           <div className="text-center">
             <div className="inline-flex items-center justify-center bg-primary text-primary-foreground p-3 rounded-lg shadow-lg mb-4">
               <Target className="w-10 h-10" />
@@ -299,5 +294,13 @@ export default function RecruiterPortalPage() {
         </footer>
       </div>
     </div>
+  );
+}
+
+export default function RecruiterPortalPage() {
+  return (
+    <AuthGuard>
+      <RecruiterPortalContent />
+    </AuthGuard>
   );
 }

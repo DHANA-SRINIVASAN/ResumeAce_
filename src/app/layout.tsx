@@ -1,21 +1,16 @@
 import type {Metadata} from 'next';
 import {Geist, Geist_Mono} from 'next/font/google';
 import Link from 'next/link';
-import { Briefcase, Home, Sparkles, PanelLeft, UserCircle } from 'lucide-react'; // Added UserCircle
+import { Sparkles, PanelLeft } from 'lucide-react';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import {
   SidebarProvider,
   Sidebar,
-  SidebarHeader,
-  SidebarContent,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
   SidebarInset,
   SidebarTrigger,
-  SidebarFooter,
 } from '@/components/ui/sidebar';
+import { AppSidebarNavigation } from '@/components/app-sidebar-navigation'; // Import the new client component
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -42,42 +37,8 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <SidebarProvider defaultOpen={false}>
           <Sidebar>
-            <SidebarHeader className="p-4 flex items-center gap-2">
-              <Sparkles className="w-8 h-8 text-primary" />
-              <h1 className="text-2xl font-bold text-primary">
-                Resume<span className="text-accent">Ace</span>
-              </h1>
-            </SidebarHeader>
-            <SidebarContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <Link href="/" legacyBehavior passHref>
-                    <SidebarMenuButton asChild variant="default" size="default" tooltip="Go to Home Portal">
-                      <a><Home /> Home Portal</a>
-                    </SidebarMenuButton>
-                  </Link>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <Link href="/candidate-portal" legacyBehavior passHref>
-                    <SidebarMenuButton asChild variant="default" size="default" tooltip="Access Candidate Tools">
-                       <a><UserCircle /> Candidate Portal</a>
-                    </SidebarMenuButton>
-                  </Link>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <Link href="/recruiter-portal" legacyBehavior passHref>
-                    <SidebarMenuButton asChild variant="default" size="default" tooltip="Access Recruiter Portal">
-                       <a><Briefcase /> Recruiter Portal</a>
-                    </SidebarMenuButton>
-                  </Link>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarContent>
-            <SidebarFooter className="p-2">
-              <p className="text-xs text-sidebar-foreground/70 text-center">
-                &copy; {new Date().getFullYear()} ResumeAce
-              </p>
-            </SidebarFooter>
+            {/* Sidebar content is now handled by AppSidebarNavigation */}
+            <AppSidebarNavigation />
           </Sidebar>
 
           <SidebarInset>
@@ -101,7 +62,7 @@ export default function RootLayout({
                 </SidebarTrigger>
             </header>
 
-            <main className="flex-1">{children}</main> {/* Removed p-4 md:p-6 lg:p-8 to allow pages to control their own padding */}
+            <main className="flex-1">{children}</main>
             <Toaster />
           </SidebarInset>
         </SidebarProvider>

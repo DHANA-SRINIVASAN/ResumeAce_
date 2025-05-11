@@ -1,8 +1,9 @@
 // src/app/signup/page.tsx
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,6 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { UserPlus, Mail, Lock, User as UserIcon, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useAuth } from '@/hooks/useAuth'; // Import useAuth
 
 const PasswordSpecifications = () => (
   <Alert variant="default" className="bg-secondary/30 border-secondary mt-4">
@@ -34,6 +36,15 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const auth = useAuth(); // Use the auth hook
+  const router = useRouter();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (auth.isLoggedIn) {
+      router.replace('/candidate-portal'); // Or your default dashboard
+    }
+  }, [auth.isLoggedIn, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,18 +56,42 @@ export default function SignupPage() {
       });
       return;
     }
+    // Basic password validation for placeholder
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!passwordRegex.test(password)) {
+      toast({
+        title: "Weak Password",
+        description: "Password does not meet the requirements. Please check the specifications below.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Simulate API call for account creation
+    await new Promise(resolve => setTimeout(resolve, 1000));
     setIsLoading(false);
+
     toast({
-      title: "Sign Up Attempted",
-      description: "This is a placeholder sign up. No actual account has been created.",
+      title: "Sign Up Successful",
+      description: "Account created! Redirecting...",
       variant: "default",
     });
-    // In a real app, you'd handle account creation here
-    console.log('Sign up attempt with:', { name, email, password });
+    // In a real app, you'd handle account creation and then login.
+    // Here, we just simulate login directly.
+    const redirectPath = localStorage.getItem('redirectAfterLogin') || '/candidate-portal';
+    localStorage.removeItem('redirectAfterLogin'); // Clean up
+    auth.login(redirectPath);
   };
+  
+  // If auth is loading or user is already logged in, show minimal UI or loading
+  if (auth.isLoading || auth.isLoggedIn) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p>Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-secondary/30 flex items-center justify-center p-4">
@@ -81,7 +116,7 @@ export default function SignupPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                disabled={isLoading}
+                disabled={isLoading || auth.isLoggedIn}
               />
             </div>
             <div className="space-y-2">
@@ -95,7 +130,7 @@ export default function SignupPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={isLoading}
+                disabled={isLoading || auth.isLoggedIn}
               />
             </div>
             <div className="space-y-2">
@@ -109,7 +144,7 @@ export default function SignupPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                disabled={isLoading}
+                disabled={isLoading || auth.isLoggedIn}
               />
             </div>
             <div className="space-y-2">
@@ -123,11 +158,11 @@ export default function SignupPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
-                disabled={isLoading}
+                disabled={isLoading || auth.isLoggedIn}
               />
             </div>
             <PasswordSpecifications />
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full" disabled={isLoading || auth.isLoggedIn}>
               {isLoading ? 'Creating Account...' : 'Sign Up'}
             </Button>
           </form>

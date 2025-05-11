@@ -1,35 +1,72 @@
 // src/app/login/page.tsx
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { LogIn, Mail, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth'; // Import useAuth
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const auth = useAuth(); // Use the auth hook
+  const router = useRouter();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (auth.isLoggedIn) {
+      router.replace('/candidate-portal'); // Or your default dashboard
+    }
+  }, [auth.isLoggedIn, router]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Simulate successful login
+    // In a real app, you'd verify credentials against a backend
+    const simulatedSuccess = email.length > 0 && password.length > 0; // Basic check for placeholder
+
     setIsLoading(false);
-    toast({
-      title: "Login Attempted",
-      description: "This is a placeholder login. No actual authentication has occurred.",
-      variant: "default",
-    });
-    // In a real app, you'd handle authentication here
-    console.log('Login attempt with:', { email, password });
+
+    if (simulatedSuccess) {
+      toast({
+        title: "Login Successful",
+        description: "Welcome back! Redirecting...",
+        variant: "default",
+      });
+      const redirectPath = localStorage.getItem('redirectAfterLogin') || '/candidate-portal';
+      localStorage.removeItem('redirectAfterLogin'); // Clean up
+      auth.login(redirectPath); // Use auth.login to set state and redirect
+    } else {
+      toast({
+        title: "Login Failed",
+        description: "Invalid credentials. This is a placeholder.",
+        variant: "destructive",
+      });
+    }
   };
+  
+  // If auth is loading or user is already logged in, show minimal UI or loading
+  if (auth.isLoading || auth.isLoggedIn) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-secondary/30 flex items-center justify-center p-4">
@@ -54,7 +91,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={isLoading}
+                disabled={isLoading || auth.isLoggedIn}
               />
             </div>
             <div className="space-y-2">
@@ -68,10 +105,10 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                disabled={isLoading}
+                disabled={isLoading || auth.isLoggedIn}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full" disabled={isLoading || auth.isLoggedIn}>
               {isLoading ? 'Logging in...' : 'Login'}
             </Button>
           </form>
