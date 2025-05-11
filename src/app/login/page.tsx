@@ -23,7 +23,14 @@ export default function LoginPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (auth.isLoggedIn) {
-      router.replace('/candidate-portal'); // Or your default dashboard
+      // Check if there's a specific redirect path, otherwise go to home to choose portal
+      const intendedRedirect = localStorage.getItem('redirectAfterLogin');
+      if (intendedRedirect && intendedRedirect !== '/login' && intendedRedirect !== '/signup') {
+        router.replace(intendedRedirect);
+        localStorage.removeItem('redirectAfterLogin');
+      } else {
+        router.replace('/'); // Default to home page if already logged in without specific path
+      }
     }
   }, [auth.isLoggedIn, router]);
 
@@ -46,7 +53,7 @@ export default function LoginPage() {
         description: "Welcome back! Redirecting...",
         variant: "default",
       });
-      const redirectPath = localStorage.getItem('redirectAfterLogin') || '/candidate-portal';
+      const redirectPath = localStorage.getItem('redirectAfterLogin') || '/'; // Changed default to '/'
       localStorage.removeItem('redirectAfterLogin'); // Clean up
       auth.login(redirectPath); // Use auth.login to set state and redirect
     } else {
@@ -58,8 +65,9 @@ export default function LoginPage() {
     }
   };
   
-  // If auth is loading or user is already logged in, show minimal UI or loading
-  if (auth.isLoading || auth.isLoggedIn) {
+  // If auth is loading show minimal UI or loading
+  // If user is already logged in and useEffect hasn't redirected yet, also show loading
+  if (auth.isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <p>Loading...</p>
@@ -125,3 +133,4 @@ export default function LoginPage() {
     </div>
   );
 }
+

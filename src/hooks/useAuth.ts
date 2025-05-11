@@ -44,7 +44,7 @@ export function useAuth(): AuthState {
   }, []);
 
 
-  const login = useCallback((redirectPath: string = '/candidate-portal') => {
+  const login = useCallback((redirectPath: string = '/') => { // Changed default redirect to '/'
     if (typeof window !== 'undefined') {
       localStorage.setItem(AUTH_KEY, 'true');
       setIsLoggedIn(true);
@@ -62,3 +62,4 @@ export function useAuth(): AuthState {
 
   return { isLoggedIn, isLoading, login, logout, checkAuth };
 }
+

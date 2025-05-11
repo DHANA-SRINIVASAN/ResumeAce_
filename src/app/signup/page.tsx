@@ -42,7 +42,7 @@ export default function SignupPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (auth.isLoggedIn) {
-      router.replace('/candidate-portal'); // Or your default dashboard
+      router.replace('/'); // Default to home page if already logged in
     }
   }, [auth.isLoggedIn, router]);
 
@@ -79,13 +79,13 @@ export default function SignupPage() {
     });
     // In a real app, you'd handle account creation and then login.
     // Here, we just simulate login directly.
-    const redirectPath = localStorage.getItem('redirectAfterLogin') || '/candidate-portal';
+    const redirectPath = localStorage.getItem('redirectAfterLogin') || '/'; // Changed default to '/'
     localStorage.removeItem('redirectAfterLogin'); // Clean up
     auth.login(redirectPath);
   };
   
   // If auth is loading or user is already logged in, show minimal UI or loading
-  if (auth.isLoading || auth.isLoggedIn) {
+  if (auth.isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <p>Loading...</p>
@@ -176,3 +176,4 @@ export default function SignupPage() {
     </div>
   );
 }
+
