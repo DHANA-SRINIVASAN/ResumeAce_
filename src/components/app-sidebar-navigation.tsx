@@ -44,10 +44,6 @@ export function AppSidebarNavigation() {
     );
   }
 
-  // Condition for showing Candidate and Recruiter portal links
-  // Changed: Portal links are shown if the user is logged in, regardless of the current page.
-  const showPortalLinks = isLoggedIn;
-
   return (
     <>
         <SidebarHeader className="p-4 flex items-center gap-2">
@@ -68,33 +64,29 @@ export function AppSidebarNavigation() {
 
             {isLoggedIn ? (
                 <>
-                {showPortalLinks && ( 
-                    <>
-                        <SidebarMenuItem>
-                            <Link href="/candidate-portal" legacyBehavior passHref>
-                            <SidebarMenuButton asChild variant="default" size="default" tooltip="Access Candidate Tools">
-                                <a><UserCircle /> Candidate Portal</a>
-                            </SidebarMenuButton>
-                            </Link>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                            <Link href="/recruiter-portal" legacyBehavior passHref>
-                            <SidebarMenuButton asChild variant="default" size="default" tooltip="Access Recruiter Portal">
-                                <a><Briefcase /> Recruiter Portal</a>
-                            </SidebarMenuButton>
-                            </Link>
-                        </SidebarMenuItem>
-                    </>
-                )}
-                <SidebarMenuItem>
-                    <SidebarMenuButton variant="ghost" size="default" onClick={logout} tooltip="Log out">
-                        <LogOut /> Logout
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
+                    <SidebarMenuItem>
+                        <Link href="/candidate-portal" legacyBehavior passHref>
+                        <SidebarMenuButton asChild variant="default" size="default" tooltip="Access Candidate Tools">
+                            <a><UserCircle /> Candidate Portal</a>
+                        </SidebarMenuButton>
+                        </Link>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                        <Link href="/recruiter-portal" legacyBehavior passHref>
+                        <SidebarMenuButton asChild variant="default" size="default" tooltip="Access Recruiter Portal">
+                            <a><Briefcase /> Recruiter Portal</a>
+                        </SidebarMenuButton>
+                        </Link>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                        <SidebarMenuButton variant="ghost" size="default" onClick={logout} tooltip="Log out">
+                            <LogOut /> Logout
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
                 </>
             ) : (
                 <>
-                {/* Login and Signup links are only shown if not logged in */}
+                {/* Show Login and Signup links only if not on login/signup pages */}
                 {pathname !== '/login' && pathname !== '/signup' && (
                     <>
                         <SidebarMenuItem>
@@ -125,3 +117,4 @@ export function AppSidebarNavigation() {
     </>
   );
 }
+
