@@ -55,8 +55,8 @@ export function AppSidebarNavigation() {
             <SidebarMenu>
             <SidebarMenuItem>
                 <Link href="/" legacyBehavior passHref>
-                <SidebarMenuButton asChild variant="default" size="default" tooltip="Go to Home Portal">
-                    <a><Home /> Home Portal</a>
+                <SidebarMenuButton asChild variant="default" size="default" tooltip="Go to Home">
+                    <a><Home /> Home</a>
                 </SidebarMenuButton>
                 </Link>
             </SidebarMenuItem>
@@ -111,3 +111,4 @@ export function AppSidebarNavigation() {
     </>
   );
 }
+
