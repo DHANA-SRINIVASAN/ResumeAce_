@@ -10,34 +10,29 @@
 
 import {ai} from '@/ai/genkit';
 import {z}from 'genkit';
-import type { GenerateResponseData } from 'genkit/generate'; 
 
 const JobRecommenderInputSchema = z.object({
   skills: z.array(z.string()).describe('A list of skills from the resume.'),
-  experienceSummary: z.string().describe('A summary of the work experience from the resume.'),
+  experienceSummary: z.string().describe('A summary of the work experience from the resume, especially the most recent experience.'),
   projectsSummary: z.array(z.string()).optional().describe('A list of project descriptions from the resume, which can highlight practical application of skills.'),
   targetRole: z.string().optional().describe('A specific target role the user might be interested in.'),
 });
 export type JobRecommenderInput = z.infer<typeof JobRecommenderInputSchema>;
 
 const RecommendedJobSchemaRequired = z.object({
-  title: z.string().describe('The job title. This field is absolutely mandatory for every job recommendation.'),
+  title: z.string().describe('The job title. This field is absolutely mandatory.'),
   company: z.string().describe('The hiring company name. This field is mandatory.'),
-  location: z.string().optional().describe('The job location, preferably one of Chennai, Bangalore, Hyderabad, Coimbatore, Trichy if applicable.'),
-  description: z.string().describe('A brief description of why this job is a good fit for the candidate based on their resume. This field is mandatory.'),
-  relevanceScore: z.number().min(0).max(1).describe('A score from 0.0 to 1.0 indicating the relevance of this job to the resume. This field is mandatory.'),
-  suggestedSearchLinks: z.object({
-    linkedIn: z.string().optional().describe("A suggested search URL for finding similar jobs on LinkedIn. Example: 'https://www.linkedin.com/jobs/search/?keywords=Software%20Engineer%20Remote'"),
-    naukri: z.string().optional().describe("A suggested search URL for finding similar jobs on Naukri. Example: 'https://www.naukri.com/software-engineer-jobs-in-bangalore'"),
-    indeed: z.string().optional().describe("A suggested search URL for finding similar jobs on Indeed. Example: 'https://in.indeed.com/jobs?q=data+analyst&l=Mumbai'"),
-    glassdoor: z.string().optional().describe("A suggested search URL for finding similar jobs on Glassdoor. Example: 'https://www.glassdoor.co.in/Job/software-engineer-jobs-SRCH_KO0,17.htm'")
-  }).describe("Suggested search URLs for popular job platforms. This object is mandatory.")
+  location: z.string().optional().describe('The job location. Prioritize locations in India like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy if applicable, or as indicated by resume.'),
+  keyRequiredSkills: z.array(z.string()).describe('A list of 3-5 key skills required for the job, directly from the job posting if possible. This field is mandatory.'),
+  description: z.string().describe('A short job description (2-3 sentences) summarizing the role and its key responsibilities. This field is mandatory.'),
+  applicationLink: z.string().url().describe('A direct application link for the job, preferably from LinkedIn, Indeed, or SimplyHired. This field is mandatory.'),
+  matchScore: z.number().min(0).max(100).describe('A score from 0 to 100 indicating how well the job aligns with the candidate’s skills and experience. This field is mandatory.'),
 });
 const RecommendedJobSchemaLax = RecommendedJobSchemaRequired.partial();
 
 
 const JobRecommenderOutputSchema = z.object({
-  jobs: z.array(RecommendedJobSchemaRequired).describe('A list of 10-15 recommended jobs, prioritizing locations in India like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy.'),
+  jobs: z.array(RecommendedJobSchemaRequired).min(5).max(10).describe('A list of 5-10 recommended jobs. Prioritize jobs that closely match the candidate’s most recent experience and top skills. Locations in India like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy should be considered if relevant.'),
 });
 export type JobRecommenderOutput = z.infer<typeof JobRecommenderOutputSchema>;
 export type RecommendedJob = z.infer<typeof RecommendedJobSchemaRequired>;
@@ -51,43 +46,36 @@ const jobRecommenderPrompt = ai.definePrompt({
   name: 'jobRecommenderPrompt',
   input: {schema: JobRecommenderInputSchema},
   output: {schema: z.object({jobs: z.array(RecommendedJobSchemaLax)})}, 
-  prompt: `You are an expert career advisor and job recommender. Your primary goal is to provide highly relevant job suggestions based *directly* on the candidate's resume details.
+  prompt: `You are an expert AI career advisor and job recommender.
+Analyze the candidate's resume details (skills, most recent experience, projects). Based on this, recommend 5-10 relevant job openings. Prioritize jobs that closely match the candidate’s most recent experience and top skills.
+Prioritize jobs located in India, specifically in cities like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy, if these align with the profile or are generally suitable.
 
-Your first task is to meticulously analyze the 'Resume Details' (Skills, Experience Summary, Projects Summary).
-From this analysis, identify dominant and recurring skills, technologies, or experience themes. These themes will be the foundation for your job recommendations.
-
-Generate 10-15 job recommendations.
-Prioritize jobs located in India, specifically in cities like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy. If the candidate's profile strongly suggests a different location or if no suitable jobs are found in these specific cities, you may suggest jobs in other locations in India or remote jobs. Always include a 'location' field in the job object.
-
-For each identified theme, formulate a job recommendation. The 'title' of each job *must directly derive* from these themes and the specific language used in the resume. For example, if the resume heavily features "React development, UI/UX design, and agile methodologies," a relevant job title could be "React Frontend Developer" or "UI Developer with React." Avoid generic titles like "Software Engineer" unless the resume's breadth and depth overwhelmingly support such a general role. If the resume is highly specialized (e.g., "Quantitative Analyst with Python and C++ for HFT"), the job title should reflect this specialization.
-
-{{#if targetRole}}
-The user has expressed an interest in the role: '{{{targetRole}}}'. If this target role aligns well with the dominant themes you identified from the resume, prioritize recommendations related to it. However, if '{{{targetRole}}}' significantly diverges from the resume's content, you must still base your primary recommendations on the resume's actual skills and experience. The core job recommendations must be grounded in the resume.
-{{/if}}
-
-For each and every job role, you MUST provide:
-1.  **Title**: (As described above) This field is absolutely critical and mandatory. If you cannot confidently generate a valid, non-empty, and *relevant* title based on the resume's themes, omit that entire job entry.
-2.  **Company**: A plausible company name (e.g., "Tech Solutions Inc.", "Innovatech", or a well-known company if appropriate). This is mandatory.
-3.  **Location**: The city and country of the job (e.g., "Chennai, India", "Remote, India"). Prioritize the specified Indian cities. This field is mandatory.
-4.  **Description**: This description (1-3 sentences) MUST explicitly reference specific skills, phrases from the 'Experience Summary', or details from 'Projects Summary' from the provided resume to justify why this job is a strong match. For example: "This 'React Frontend Developer' role at 'Innovatech' in Bangalore, India is an excellent fit given your demonstrated expertise in 'React development' and 'UI/UX design principles' mentioned in your skills, and your project experience in 'building responsive web applications with React' as detailed in your Projects Summary." Generic descriptions are unacceptable. This field is mandatory.
-5.  **Relevance Score**: A number between 0.0 and 1.0 indicating how relevant *this specific job title and description* are to the *provided resume details*. A score of 1.0 means a perfect match for the resume's core strengths. Jobs with a relevance score of 0.5 or higher can be included if they are in the prioritized Indian cities. This field is mandatory.
-6.  **Suggested Search Links**: An object containing optional string URLs for LinkedIn, Naukri, Indeed, and Glassdoor. These URLs should be functional search queries based on the *specific job title, key skills, and location*. For example, for LinkedIn: 'https://www.linkedin.com/jobs/search/?keywords=Python%20Django%20Developer&location=Bangalore%2C%20India'. This 'suggestedSearchLinks' object is mandatory, even if individual links are not always generatable (provide valid default search query URLs for each platform based on the job title and location if specific ones cannot be formed).
+For each job recommendation, you MUST provide:
+1.  **Job Title**: (e.g., "Software Engineer", "Data Analyst"). This field is absolutely critical and mandatory.
+2.  **Company Name**: (e.g., "Tech Solutions Inc.", "Google"). This field is mandatory.
+3.  **Location**: (e.g., "Chennai, India", "Remote"). This field is mandatory.
+4.  **Key Required Skills**: A list of 3-5 key skills explicitly mentioned in the job requirements (e.g., ["Python", "SQL", "AWS"]). This field is mandatory.
+5.  **Short Job Description**: A concise summary (2-3 sentences) of the job's main responsibilities and purpose. This field is mandatory.
+6.  **Application Link**: A direct, functional URL to the job application page, preferably from LinkedIn, Indeed, or SimplyHired. This field is mandatory and must be a valid URL.
+7.  **Match Score**: A percentage (0-100) representing the alignment of the job with the candidate's skills and experience (especially recent experience). This field is mandatory.
 
 Resume Details:
-Skills: {{#if skills}}{{#each skills}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}No specific skills listed.{{/if}}
-Experience Summary: {{{experienceSummary}}}
+Top Skills: {{#if skills}}{{#each skills}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}No specific skills listed.{{/if}}
+Most Recent Experience Summary: {{{experienceSummary}}}
 {{#if projectsSummary}}
-Projects Summary:
+Projects Summary (if relevant):
 {{#each projectsSummary}}
 - {{{this}}}
 {{/each}}
 {{/if}}
+{{#if targetRole}}
+User's Stated Target Role (consider this but prioritize resume content): {{{targetRole}}}
+{{/if}}
 
-Prioritize direct relevance to the resume's content and preferred locations.
-Ensure ALL required fields ('title', 'company', 'location', 'description', 'relevanceScore', and 'suggestedSearchLinks') are present for *every* job object in the 'jobs' array.
-The output must strictly adhere to the JSON schema. The 'title' and 'description' relevance is paramount.
-Do not include job entries if they lack a valid 'title' or a description that clearly links to the resume content.
-While direct relevance is key, if finding 10-15 specific roles in the target cities (Chennai, Bangalore, Hyderabad, Coimbatore, Trichy) requires including roles with a broader connection to the resume's themes, that is acceptable as long as the relevanceScore accurately reflects the match (e.g., a score of 0.5 or higher is acceptable for these prioritized locations).
+Focus on providing high-quality, actionable recommendations. Ensure all fields are populated correctly. If a suitable application link from LinkedIn, Indeed, or SimplyHired cannot be found, you may use a general careers page link for the company if a specific role matching the description is likely listed there, but prioritize direct job links.
+The 'keyRequiredSkills' should be derived from typical requirements for such a role if not explicitly available for a general link.
+Output strictly in the defined JSON schema. Only include jobs if you can provide all mandatory fields.
+Include 5-10 jobs.
 `,
 });
 
@@ -104,71 +92,64 @@ const jobRecommenderFlow = ai.defineFlow(
 
     if (!rawOutput || !rawOutput.jobs) {
       const firstCandidateMessageContent = llmResponse.candidates?.[0]?.message?.content?.[0];
-      // Log more details if available, helping to debug schema or LLM issues.
       const errorDetails = firstCandidateMessageContent?.data ?? firstCandidateMessageContent?.text ?? "No detailed error message available from LLM.";
       
       console.error(
         "JobRecommenderFlow: Schema validation failed or LLM returned no/invalid jobs array. LLM response content:",
-        JSON.stringify(errorDetails).substring(0, 1000) // Log first 1KB of error details
+        JSON.stringify(errorDetails).substring(0, 1000) 
       );
       if (llmResponse.error) {
         console.error("JobRecommenderFlow: Underlying Genkit error:", llmResponse.error);
       }
-      // Return an empty jobs array if the LLM output is not as expected or validation fails.
       return { jobs: [] }; 
     }
     
     const processedJobs: RecommendedJob[] = [];
 
     for (const job of rawOutput.jobs) {
-      // Ensure job is an object before trying to access its properties
       const currentJob = job || {}; 
 
-      // Validate 'title': must be a non-empty string.
       const title = (currentJob.title && currentJob.title.trim() !== "") ? currentJob.title.trim() : null;
-      
-      // If title is missing or empty, skip this job entry.
       if (!title) {
         console.warn("JobRecommenderFlow: Skipping job due to missing or empty title.", currentJob);
         continue;
       }
 
-      // Provide defaults for other mandatory fields if missing or empty.
       const company = (currentJob.company && currentJob.company.trim() !== "") ? currentJob.company.trim() : "Unknown Company";
       const location = (currentJob.location && currentJob.location.trim() !== "") ? currentJob.location.trim() : "Unknown Location";
+      
+      const keyRequiredSkills = Array.isArray(currentJob.keyRequiredSkills) && currentJob.keyRequiredSkills.length > 0 
+                                ? currentJob.keyRequiredSkills.map(s => String(s).trim()).filter(s => s) 
+                                : ["Skill not specified"];
+      
       const description = (currentJob.description && currentJob.description.trim() !== "") ? currentJob.description.trim() : "No description provided.";
       
-      // Validate 'relevanceScore': must be a number between 0 and 1. Default to 0 if invalid.
-      const relevanceScore = (typeof currentJob.relevanceScore === 'number' && currentJob.relevanceScore >= 0 && currentJob.relevanceScore <= 1) ? currentJob.relevanceScore : 0;
+      let applicationLink = (currentJob.applicationLink && currentJob.applicationLink.trim() !== "") ? currentJob.applicationLink.trim() : `https://www.google.com/search?q=${encodeURIComponent(title + " " + company + " " + location)}`;
+      try {
+        new URL(applicationLink); // Validate URL
+      } catch (_) {
+        console.warn(`JobRecommenderFlow: Invalid applicationLink URL "${applicationLink}" for job "${title}". Defaulting to Google search.`);
+        applicationLink = `https://www.google.com/search?q=${encodeURIComponent(title + " " + company + " " + location)}`;
+      }
       
-      const defaultSearchLinks = {
-        linkedIn: `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(title)}&location=${encodeURIComponent(location)}`,
-        naukri: `https://www.naukri.com/jobs-in-${encodeURIComponent(location.split(',')[0].toLowerCase().replace(/\s+/g, '-'))}?k=${encodeURIComponent(title)}`, // Basic location formatting
-        indeed: `https://indeed.com/jobs?q=${encodeURIComponent(title)}&l=${encodeURIComponent(location)}`,
-        glassdoor: `https://www.glassdoor.com/Job/jobs.htm?sc.keyword=${encodeURIComponent(title)}&locT=C&locId=${encodeURIComponent(location)}` // locT=C for city, locId needs mapping usually
-      };
+      const matchScore = (typeof currentJob.matchScore === 'number' && currentJob.matchScore >= 0 && currentJob.matchScore <= 100) ? currentJob.matchScore : 0;
       
-      // Ensure suggestedSearchLinks is an object, defaulting to empty if not provided.
-      const currentLinks = currentJob.suggestedSearchLinks || {};
-
       processedJobs.push({
         title,
         company,
         location,
+        keyRequiredSkills,
         description,
-        relevanceScore,
-        suggestedSearchLinks: { // Ensure all link properties are present, defaulting if necessary.
-            linkedIn: currentLinks.linkedIn || defaultSearchLinks.linkedIn,
-            naukri: currentLinks.naukri || defaultSearchLinks.naukri,
-            indeed: currentLinks.indeed || defaultSearchLinks.indeed,
-            glassdoor: currentLinks.glassdoor || defaultSearchLinks.glassdoor,
-        },
+        applicationLink,
+        matchScore,
       });
     }
     
-    // Ensure the final output conforms to JobRecommenderOutputSchema, especially the 'jobs' array.
-    return { jobs: processedJobs };
+    // Ensure between 5 and 10 jobs, even if it means truncating or padding (though padding isn't done here, relying on prompt)
+    const finalJobs = processedJobs.slice(0, 10); 
+    // If LLM returns fewer than 5, it will be less, but prompt aims for 5-10.
+    // We could add logic to ensure minimum 5, but that might involve re-query or complex filling.
+
+    return { jobs: finalJobs };
   }
 );
-
-
