@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
+import Link from 'next/link'; // Added Link import
 import { ResumeUploadForm } from '@/components/resume-upload-form';
 import { AnalysisResultsDisplay } from '@/components/analysis-results-display';
 import { ScoreFeedbackDisplay } from '@/components/score-feedback-display';
@@ -18,7 +19,7 @@ import { analyzeResumeAndScore, type AnalyzeResumeAndScoreOutput } from '@/ai/fl
 import { getJobRecommendations, type JobRecommenderOutput } from '@/ai/flows/job-recommender';
 import { fileToDataUri } from '@/lib/file-utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, FileText, Sparkles, Target, Bot, MapPinned, Filter, BookOpen } from 'lucide-react';
+import { BarChart, FileText, Sparkles, Target, Bot, MapPinned, Filter, BookOpen, Briefcase } from 'lucide-react'; // Added Briefcase
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
@@ -88,15 +89,14 @@ export default function HomePage() {
       analysisSteps.push({ stage: "Resume Scoring", status: "Completed" });
 
 
-      if (scoreData.score >= 30) { // Updated threshold to 30
+      if (scoreData.score >= 30) { 
         setCurrentStage("Fetching job recommendations...");
-        // Try to infer a target role from the most recent experience for better job recs
+        
         let inferredTargetRole : string | undefined = undefined;
         if (analysis.experience) {
             const experienceLines = analysis.experience.split('\n');
             if (experienceLines.length > 0) {
                 const firstExperienceLine = experienceLines[0];
-                // Simple inference: take text before " at " or " | "
                 const roleMatch = firstExperienceLine.match(/^([^@|]+)/);
                 if (roleMatch && roleMatch[1]) {
                     inferredTargetRole = roleMatch[1].trim();
@@ -114,6 +114,7 @@ export default function HomePage() {
         setJobRecommendations(jobRecs);
         analysisSteps.push({ stage: "Job Recommendations", status: "Completed" });
       } else {
+         setJobRecommendations({jobs: []}); // Ensure jobRecommendations is not null
          analysisSteps.push({ stage: "Job Recommendations", status: `Skipped (Score < 30)` });
       }
 
@@ -125,7 +126,6 @@ export default function HomePage() {
     } finally {
       setIsProcessing(false);
       setCurrentStage("");
-      // console.log("Analysis Steps:", analysisSteps); // For debugging
     }
   }, []);
 
@@ -183,7 +183,7 @@ export default function HomePage() {
             <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-6 mb-6">
                 <TabsTrigger value="analysis" className="flex items-center gap-2"><FileText size={18}/>Analysis</TabsTrigger>
                 <TabsTrigger value="feedback" className="flex items-center gap-2"><Bot size={18}/>AI Chat</TabsTrigger>
-                <TabsTrigger value="jobs" className="flex items-center gap-2" disabled={!jobRecommendations && scoreResult && scoreResult.score < 30}><Target size={18}/>Jobs</TabsTrigger>
+                <TabsTrigger value="jobs" className="flex items-center gap-2" disabled={!scoreResult || scoreResult.score < 30}><Target size={18}/>Jobs</TabsTrigger>
                 <TabsTrigger value="roadmap" className="flex items-center gap-2"><MapPinned size={18}/>Roadmap</TabsTrigger>
                 <TabsTrigger value="bias" className="flex items-center gap-2"><Filter size={18}/>Bias Check</TabsTrigger>
                 <TabsTrigger value="courses" className="flex items-center gap-2"><BookOpen size={18}/>Courses</TabsTrigger>
@@ -200,7 +200,7 @@ export default function HomePage() {
             </TabsContent>
             <TabsContent value="jobs">
                  {jobRecommendations && <JobRecommendationsDisplay recommendations={jobRecommendations} />}
-                 {!jobRecommendations && scoreResult && scoreResult.score < 30 && (
+                 {(!jobRecommendations || jobRecommendations.jobs.length === 0) && scoreResult && scoreResult.score < 30 && (
                     <Card className="shadow-md">
                         <CardHeader>
                             <CardTitle>Job Recommendations Locked</CardTitle>
@@ -210,6 +210,16 @@ export default function HomePage() {
                         </CardContent>
                     </Card>
                  )}
+                  {(!jobRecommendations || jobRecommendations.jobs.length === 0) && scoreResult && scoreResult.score >= 30 && (
+                    <Card className="shadow-md">
+                        <CardHeader>
+                            <CardTitle>No Job Recommendations</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-muted-foreground">We couldn't find specific job recommendations based on your current resume. Try refining your resume content for more targeted results or check back later.</p>
+                        </CardContent>
+                    </Card>
+                  )}
             </TabsContent>
             <TabsContent value="roadmap">
                 <CareerRoadmapDisplay analysisResult={analysisResult} />
@@ -273,7 +283,11 @@ export default function HomePage() {
             <p className="text-sm text-muted-foreground">
                 &copy; {new Date().getFullYear()} ResumeAce. Powered by Advanced AI.
             </p>
-            <p className="text-xs text-muted-foreground mt-1">
+             <Link href="/recruiter-portal" className="text-sm text-primary hover:underline mt-2 inline-flex items-center">
+                <Briefcase className="w-4 h-4 mr-2" />
+                Recruiter Portal
+            </Link>
+            <p className="text-xs text-muted-foreground mt-2">
                 All suggestions are AI-generated. Please verify critical information independently.
             </p>
         </footer>
