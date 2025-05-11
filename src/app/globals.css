@@ -7,73 +7,78 @@
 
 @layer base {
   :root {
-    --background: 200 17% 94%; /* Light Gray #ecf0f1 */
-    --foreground: 210 20% 20%; /* Dark Gray for text */
+    --background: 220 30% 97%; /* Lighter, slightly cool off-white */
+    --foreground: 220 25% 25%; /* Dark, slightly cool gray */
     --card: 0 0% 100%; /* White */
-    --card-foreground: 210 20% 20%;
+    --card-foreground: 220 25% 25%;
     --popover: 0 0% 100%;
-    --popover-foreground: 210 20% 20%;
-    --primary: 207 68% 53%; /* Professional Blue #3498db */
+    --popover-foreground: 220 25% 25%;
+    --primary: 210 80% 55%; /* Vibrant, trustworthy blue */
     --primary-foreground: 0 0% 100%; /* White */
-    --secondary: 210 15% 88%; /* Slightly darker gray */
-    --secondary-foreground: 210 20% 20%;
-    --muted: 210 15% 90%;
-    --muted-foreground: 210 10% 45%;
-    --accent: 145 63% 49%; /* Vibrant Green #2ecc71 */
-    --accent-foreground: 0 0% 100%; /* White */
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 210 10% 80%; /* Light gray border */
-    --input: 210 10% 80%;
-    --ring: 207 68% 53%; /* Primary blue for focus rings */
+    --secondary: 215 50% 92%; /* Softer, light blue-gray */
+    --secondary-foreground: 215 30% 35%;
+    --muted: 220 40% 94%; /* Slightly darker than background */
+    --muted-foreground: 220 20% 50%; /* Softer gray for muted text */
+    --accent: 260 80% 65%; /* Engaging violet/purple */
+    --accent-foreground: 0 0% 100%; /* White for contrast on violet */
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 25% 88%; /* Softer border */
+    --input: 220 25% 92%; /* Slightly off-white input */
+    --ring: 210 80% 60%; /* Primary blue for focus rings */
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Sidebar variables aligned with new theme */
+    --sidebar-background: hsl(var(--background));
+    --sidebar-foreground: hsl(var(--foreground));
+    --sidebar-primary: hsl(var(--primary));
+    --sidebar-primary-foreground: hsl(var(--primary-foreground));
+    --sidebar-accent: hsl(var(--primary) / 0.1); /* Background of hovered/active menu items */
+    --sidebar-accent-foreground: hsl(var(--primary)); /* Text color of hovered/active menu items */
+    --sidebar-border: hsl(var(--border));
+    --sidebar-ring: hsl(var(--ring));
   }
+
   .dark {
-    --background: 210 20% 10%; /* Dark Blue/Gray */
-    --foreground: 200 17% 94%; /* Light Gray text */
-    --card: 210 20% 15%;
-    --card-foreground: 200 17% 94%;
-    --popover: 210 20% 10%;
-    --popover-foreground: 200 17% 94%;
-    --primary: 207 68% 65%; /* Lighter Blue for dark mode */
-    --primary-foreground: 210 20% 5%; /* Very dark text */
-    --secondary: 210 15% 25%;
-    --secondary-foreground: 200 17% 94%;
-    --muted: 210 15% 20%;
-    --muted-foreground: 210 10% 65%;
-    --accent: 145 63% 55%; /* Lighter Green for dark mode */
-    --accent-foreground: 210 20% 5%; /* Very dark text */
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 210 10% 30%;
-    --input: 210 10% 30%;
-    --ring: 207 68% 65%;
+    --background: 220 25% 10%; /* Deep, cool dark blue/gray */
+    --foreground: 220 30% 90%; /* Light, cool gray for text */
+    --card: 220 25% 15%; /* Slightly lighter than background for cards */
+    --card-foreground: 220 30% 90%;
+    --popover: 220 25% 8%; /* Even darker for popovers */
+    --popover-foreground: 220 30% 90%;
+    --primary: 210 85% 70%; /* Lighter, vibrant blue for dark mode */
+    --primary-foreground: 220 20% 10%; /* Dark text on primary */
+    --secondary: 220 20% 25%; /* Muted dark blue/gray */
+    --secondary-foreground: 220 30% 80%;
+    --muted: 220 20% 20%; /* Darker muted */
+    --muted-foreground: 220 25% 65%;
+    --accent: 260 85% 75%; /* Lighter violet/purple for dark mode */
+    --accent-foreground: 220 20% 10%; /* Dark text on accent */
+    --destructive: 0 70% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 20% 28%; /* Subtle border */
+    --input: 220 20% 22%; /* Dark input background */
+    --ring: 210 85% 75%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Sidebar variables aligned with new theme for dark mode */
+    --sidebar-background: hsl(var(--background));
+    --sidebar-foreground: hsl(var(--foreground));
+    --sidebar-primary: hsl(var(--primary));
+    --sidebar-primary-foreground: hsl(var(--primary-foreground));
+    --sidebar-accent: hsl(var(--primary) / 0.15);
+    --sidebar-accent-foreground: hsl(var(--primary));
+    --sidebar-border: hsl(var(--border));
+    --sidebar-ring: hsl(var(--ring));
   }
 }
 
@@ -83,14 +88,15 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1; /* Enable common ligatures */
   }
 }
 
-/* Custom ReactFlow Styles (Optional - can be adapted further) */
+/* Custom ReactFlow Styles */
 .react-flow__node-custom {
   @apply bg-card border-2 border-primary rounded-lg shadow-lg p-0 text-card-foreground;
   font-size: 12px;
-  width: 280px; /* Ensure custom nodes have a defined width */
+  width: 280px; 
 }
 
 .react-flow__node-custom .react-flow__handle {
@@ -113,7 +119,7 @@
 }
 
 .react-flow__background path {
-    @apply stroke-border;
+    @apply stroke-border/50; /* Softer background dots */
 }
 
 .dark .react-flow__controls button {
@@ -123,5 +129,5 @@
     @apply fill-current;
 }
 .dark .react-flow__background path {
-    @apply stroke-border;
+    @apply stroke-border/50; /* Softer background dots */
 }
