@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation'; // Import usePathname
+import { usePathname } from 'next/navigation';
 import { Briefcase, Home, UserCircle, LogIn, LogOut, UserPlus, Sparkles } from 'lucide-react'; 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarHeader, SidebarFooter, SidebarContent } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
@@ -10,7 +10,7 @@ import { Skeleton } from './ui/skeleton';
 
 export function AppSidebarNavigation() {
   const { isLoggedIn, logout, isLoading } = useAuth();
-  const pathname = usePathname(); // Get current pathname
+  const pathname = usePathname(); 
 
   if (isLoading) {
     return (
@@ -45,7 +45,8 @@ export function AppSidebarNavigation() {
   }
 
   // Condition for showing Candidate and Recruiter portal links
-  const showPortalLinks = isLoggedIn && pathname !== '/';
+  // Changed: Portal links are shown if the user is logged in, regardless of the current page.
+  const showPortalLinks = isLoggedIn;
 
   return (
     <>
@@ -93,20 +94,25 @@ export function AppSidebarNavigation() {
                 </>
             ) : (
                 <>
-                <SidebarMenuItem>
-                    <Link href="/login" legacyBehavior passHref>
-                    <SidebarMenuButton asChild variant="default" size="default" tooltip="Log In">
-                        <a><LogIn /> Login</a>
-                    </SidebarMenuButton>
-                    </Link>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                    <Link href="/signup" legacyBehavior passHref>
-                    <SidebarMenuButton asChild variant="default" size="default" tooltip="Sign Up">
-                        <a><UserPlus /> Sign Up</a>
-                    </SidebarMenuButton>
-                    </Link>
-                </SidebarMenuItem>
+                {/* Login and Signup links are only shown if not logged in */}
+                {pathname !== '/login' && pathname !== '/signup' && (
+                    <>
+                        <SidebarMenuItem>
+                            <Link href="/login" legacyBehavior passHref>
+                            <SidebarMenuButton asChild variant="default" size="default" tooltip="Log In">
+                                <a><LogIn /> Login</a>
+                            </SidebarMenuButton>
+                            </Link>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <Link href="/signup" legacyBehavior passHref>
+                            <SidebarMenuButton asChild variant="default" size="default" tooltip="Sign Up">
+                                <a><UserPlus /> Sign Up</a>
+                            </SidebarMenuButton>
+                            </Link>
+                        </SidebarMenuItem>
+                    </>
+                )}
                 </>
             )}
             </SidebarMenu>
