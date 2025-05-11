@@ -47,9 +47,12 @@ const jobRecommenderPrompt = ai.definePrompt({
   name: 'jobRecommenderPrompt',
   input: {schema: JobRecommenderInputSchema},
   output: {schema: z.object({jobs: z.array(RecommendedJobSchemaLax).min(0)})}, 
-  prompt: `You are a job recommendation assistant.
-Given the following resume details, your primary goal is to find jobs that are a strong match for the candidate's listed 'Top Skills'. While considering recent experience and target role, the skill match is paramount.
-Generate 5 to 10 job recommendations. It is crucial to source these recommendations from a DIVERSE set of publicly available job portals. Specifically, try to include jobs from LinkedIn, Naukri, Indeed, Glassdoor, and SimplyHired. Aim to feature jobs from at least 3-4 different platforms if suitable matches are found.
+  prompt: `You are a job recommendation assistant. Your task is to act as an expert job sourcer.
+Using the candidate's 'Top Skills' as the **primary search criteria**, find relevant job openings from a diverse set of online job portals.
+While considering recent experience and target role, the skill match with 'Top Skills' is paramount.
+
+Generate 5 to 10 job recommendations.
+Crucially, you **must** simulate sourcing these jobs from different platforms. For the 'platform' field in your output, use specific names like 'LinkedIn', 'Naukri', 'Indeed', 'Glassdoor', or 'SimplyHired'. Provide a variety of platforms in your recommendations, aiming for at least 3-4 distinct sources if suitable jobs are found.
 Prioritize jobs located in India, specifically in cities like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy, if these align with the profile or are generally suitable.
 
 Each recommendation MUST include:
@@ -59,7 +62,7 @@ Each recommendation MUST include:
 - Required Skills (a list of 3-5 key skills directly from the job posting if possible)
 - Short Job Description (2-3 sentences summarizing the role and its key responsibilities)
 - Match Score (a percentage from 0 to 100, indicating how well the job aligns with the candidate’s skills and experience. This score MUST heavily reflect the skill alignment with the candidate's 'Top Skills'.)
-- Direct Job Link (real or dummy if scraping is not active, ensure it's a valid URL format)
+- Direct Job Link (real or plausible dummy if scraping is not active, ensure it's a valid URL format like https://example.com/job/123)
 - Platform (The name of the job portal where this job was sourced, e.g., LinkedIn, Naukri, Indeed, Glassdoor, SimplyHired. This field is mandatory.)
 
 Resume Details:
@@ -72,7 +75,7 @@ Projects Summary (if relevant):
 {{/each}}
 {{/if}}
 {{#if targetRole}}
-User's Stated Target Role (consider this, but skills are the primary driver): {{{targetRole}}}
+User's Stated Target Role (consider this, but skill match is the primary driver): {{{targetRole}}}
 {{/if}}
 
 Output strictly in the defined JSON schema. Only include jobs if you can provide all mandatory fields and the match score is 30% or higher.
@@ -177,3 +180,4 @@ const jobRecommenderFlow = ai.defineFlow(
     return { jobs: finalJobs };
   }
 );
+
