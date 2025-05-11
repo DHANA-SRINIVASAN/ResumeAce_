@@ -54,36 +54,19 @@ export default function HomePortalPage() {
         </Card>
       </div>
 
-      <Card className="mt-12 max-w-4xl w-full shadow-lg">
-        <CardHeader>
-            <CardTitle className="text-xl text-center text-primary">Explore ResumeAce Features</CardTitle>
-        </CardHeader>
-        <CardContent className="text-center">
-            <p className="text-muted-foreground mb-4">
-                Access powerful tools to enhance your career journey.
-            </p>
-            <div className="flex flex-col sm:flex-row justify-center gap-4">
-                <Button asChild variant="outline">
-                    <Link href="/candidate-portal">
-                        Candidate Portal <ExternalLink className="ml-2 h-4 w-4"/>
-                    </Link>
-                </Button>
-                <Button asChild variant="outline">
-                    <Link href="/recruiter-portal">
-                        Recruiter Portal <ExternalLink className="ml-2 h-4 w-4"/>
-                    </Link>
-                </Button>
-            </div>
-             <Image
-                src="https://picsum.photos/800/300"
-                alt="ResumeAce platform illustration"
-                width={800}
-                height={300}
-                className="mt-6 rounded-lg shadow-md mx-auto object-cover"
-                data-ai-hint="career platform"
-            />
-        </CardContent>
-      </Card>
+      {/* The "Explore ResumeAce Features" card has been removed from here. */}
+      
+      <div className="mt-12 max-w-4xl w-full text-center">
+         <Image
+            src="https://picsum.photos/800/300"
+            alt="ResumeAce platform illustration"
+            width={800}
+            height={300}
+            className="rounded-lg shadow-md mx-auto object-cover"
+            data-ai-hint="career journey"
+        />
+      </div>
+
 
       <footer className="text-center mt-16 py-8 border-t border-border w-full max-w-4xl">
         <p className="text-sm text-muted-foreground">
@@ -96,3 +79,4 @@ export default function HomePortalPage() {
     </div>
   );
 }
+
