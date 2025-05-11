@@ -262,24 +262,29 @@ Sidebar.displayName = "Sidebar"
 const SidebarTrigger = React.forwardRef<
   React.ElementRef<typeof Button>,
   React.ComponentProps<typeof Button>
->(({ className, onClick, ...props }, ref) => {
+>(({ className, onClick, children, ...props }, ref) => {
   const { toggleSidebar } = useSidebar()
 
   return (
     <Button
       ref={ref}
       data-sidebar="trigger"
-      variant="ghost"
-      size="icon"
-      className={cn("h-7 w-7", className)}
+      variant="ghost" // Default variant, can be overridden by props
+      size="icon"     // Default size, can be overridden by props
+      className={cn("h-7 w-7", className)} // Base styling, can be extended
       onClick={(event) => {
         onClick?.(event)
         toggleSidebar()
       }}
-      {...props}
+      {...props} // Spreads other props like variant, size, asChild, and custom children
     >
-      <PanelLeft />
-      <span className="sr-only">Toggle Sidebar</span>
+      {/* If children are provided in props, they will be used. Otherwise, default icon and text. */}
+      {children || (
+        <>
+          <PanelLeft />
+          <span className="sr-only">Toggle Sidebar</span>
+        </>
+      )}
     </Button>
   )
 })

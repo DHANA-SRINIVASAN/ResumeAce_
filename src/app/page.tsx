@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import Link from 'next/link'; // Added Link import
+import Link from 'next/link';
 import { ResumeUploadForm } from '@/components/resume-upload-form';
 import { AnalysisResultsDisplay } from '@/components/analysis-results-display';
 import { ScoreFeedbackDisplay } from '@/components/score-feedback-display';
@@ -16,10 +16,10 @@ import { LoadingIndicator } from '@/components/loading-indicator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { analyzeResume, type AnalyzeResumeOutput } from '@/ai/flows/resume-analyzer';
 import { analyzeResumeAndScore, type AnalyzeResumeAndScoreOutput } from '@/ai/flows/resume-score';
-import { getJobRecommendations, type JobRecommenderOutput } from '@/ai/flows/job-recommender';
+import { getJobRecommendations, type JobRecommenderOutput, type RecommendedJob } from '@/ai/flows/job-recommender';
 import { fileToDataUri } from '@/lib/file-utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, FileText, Sparkles, Target, Bot, MapPinned, Filter, BookOpen, Briefcase } from 'lucide-react'; // Added Briefcase
+import { BarChart, FileText, Sparkles, Target, Bot, MapPinned, Filter, BookOpen, Briefcase, Layers } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
@@ -104,13 +104,25 @@ export default function HomePage() {
                 }
             }
         }
-
-        const jobRecs = await getJobRecommendations({
+        
+        const inputForJobRecs: {
+            skills: string[];
+            experienceSummary: string;
+            projectsSummary?: string[];
+            targetRole?: string;
+            requiredPlatforms?: string[];
+            jobsPerPlatform?: number;
+        } = {
           skills: analysis.skills || [],
           experienceSummary: analysis.experience || "",
           projectsSummary: analysis.projects,
           targetRole: inferredTargetRole,
-        });
+          requiredPlatforms: ["LinkedIn", "Naukri", "Indeed", "Glassdoor", "SimplyHired"],
+          jobsPerPlatform: 3,
+        };
+
+
+        const jobRecs = await getJobRecommendations(inputForJobRecs);
         setJobRecommendations(jobRecs);
         analysisSteps.push({ stage: "Job Recommendations", status: "Completed" });
       } else {
@@ -236,9 +248,9 @@ export default function HomePage() {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-secondary/30 py-8">
-      <div className="container mx-auto px-4">
-        <header className="text-center mb-12">
+    <div className="min-h-screen bg-gradient-to-br from-background to-secondary/30">
+      <div className="container mx-auto"> {/* Removed px-4 and py-8 */}
+        <header className="text-center mb-12 pt-8"> {/* Added pt-8 here */}
           <div className="inline-flex items-center justify-center bg-primary text-primary-foreground p-3 rounded-lg shadow-lg mb-4">
             <Sparkles className="w-10 h-10" />
           </div>
@@ -283,6 +295,7 @@ export default function HomePage() {
             <p className="text-sm text-muted-foreground">
                 &copy; {new Date().getFullYear()} ResumeAce. Powered by Advanced AI.
             </p>
+            {/* Link is now in sidebar, can be removed or kept for redundancy */}
              <Link href="/recruiter-portal" className="text-sm text-primary hover:underline mt-2 inline-flex items-center">
                 <Briefcase className="w-4 h-4 mr-2" />
                 Recruiter Portal
@@ -295,4 +308,3 @@ export default function HomePage() {
     </div>
   );
 }
-
