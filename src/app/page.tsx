@@ -4,10 +4,22 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { LogIn, UserPlus, Sparkles, ExternalLink } from 'lucide-react';
+import { LogIn, UserPlus, Sparkles, UserCircle, Briefcase } from 'lucide-react';
 import Image from 'next/image';
+import { useAuth } from '@/hooks/useAuth';
+import { LoadingIndicator } from '@/components/loading-indicator';
 
 export default function HomePortalPage() {
+  const { isLoggedIn, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-secondary/30">
+        <LoadingIndicator text="Loading session..." />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-secondary/30 flex flex-col items-center justify-center p-4">
       <header className="text-center mb-12">
@@ -22,39 +34,76 @@ export default function HomePortalPage() {
         </p>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl w-full">
-        <Card className="shadow-xl hover:shadow-2xl transition-shadow duration-300">
-          <CardHeader className="items-center text-center">
-            <UserPlus className="w-12 h-12 text-primary mb-3" />
-            <CardTitle className="text-2xl">New User?</CardTitle>
-            <CardDescription>
-              Create an account to unlock all features.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <Button asChild size="lg" className="w-full md:w-auto">
-              <Link href="/signup">Sign Up</Link>
-            </Button>
-          </CardContent>
-        </Card>
+      {isLoggedIn ? (
+        <div className="text-center max-w-4xl w-full">
+          <h2 className="text-3xl font-semibold text-primary mb-6">Access Your Portals</h2>
+          <p className="text-muted-foreground mb-8">
+            Manage your career or find the best talent.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <Card className="shadow-xl hover:shadow-2xl transition-shadow duration-300">
+              <CardHeader className="items-center text-center">
+                <UserCircle className="w-12 h-12 text-primary mb-3" />
+                <CardTitle className="text-2xl">Candidate Portal</CardTitle>
+                <CardDescription>
+                  Analyze your resume, get job recommendations, and plan your career.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="text-center">
+                <Button asChild size="lg" className="w-full md:w-auto">
+                  <Link href="/candidate-portal">Go to Candidate Portal</Link>
+                </Button>
+              </CardContent>
+            </Card>
+            <Card className="shadow-xl hover:shadow-2xl transition-shadow duration-300">
+              <CardHeader className="items-center text-center">
+                <Briefcase className="w-12 h-12 text-primary mb-3" />
+                <CardTitle className="text-2xl">Recruiter Portal</CardTitle>
+                <CardDescription>
+                  Evaluate candidate resumes against job descriptions.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="text-center">
+                <Button asChild size="lg" className="w-full md:w-auto">
+                  <Link href="/recruiter-portal">Go to Recruiter Portal</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl w-full">
+          <Card className="shadow-xl hover:shadow-2xl transition-shadow duration-300">
+            <CardHeader className="items-center text-center">
+              <UserPlus className="w-12 h-12 text-primary mb-3" />
+              <CardTitle className="text-2xl">New User?</CardTitle>
+              <CardDescription>
+                Create an account to unlock all features.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-center">
+              <Button asChild size="lg" className="w-full md:w-auto">
+                <Link href="/signup">Sign Up</Link>
+              </Button>
+            </CardContent>
+          </Card>
 
-        <Card className="shadow-xl hover:shadow-2xl transition-shadow duration-300">
-          <CardHeader className="items-center text-center">
-            <LogIn className="w-12 h-12 text-primary mb-3" />
-            <CardTitle className="text-2xl">Existing User?</CardTitle>
-            <CardDescription>
-              Log in to access your dashboard and tools.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <Button asChild size="lg" className="w-full md:w-auto">
-              <Link href="/login">Login</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* The "Explore ResumeAce Features" card has been removed from here. */}
+          <Card className="shadow-xl hover:shadow-2xl transition-shadow duration-300">
+            <CardHeader className="items-center text-center">
+              <LogIn className="w-12 h-12 text-primary mb-3" />
+              <CardTitle className="text-2xl">Existing User?</CardTitle>
+              <CardDescription>
+                Log in to access your dashboard and tools.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-center">
+              <Button asChild size="lg" className="w-full md:w-auto">
+                <Link href="/login">Login</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
       
       <div className="mt-12 max-w-4xl w-full text-center">
          <Image
@@ -67,7 +116,6 @@ export default function HomePortalPage() {
         />
       </div>
 
-
       <footer className="text-center mt-16 py-8 border-t border-border w-full max-w-4xl">
         <p className="text-sm text-muted-foreground">
           &copy; {new Date().getFullYear()} ResumeAce. All rights reserved.
@@ -79,4 +127,3 @@ export default function HomePortalPage() {
     </div>
   );
 }
-
