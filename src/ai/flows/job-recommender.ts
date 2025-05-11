@@ -1,7 +1,7 @@
 // src/ai/flows/job-recommender.ts
 'use server';
 /**
- * @fileOverview Generates job recommendations based on resume analysis.
+ * @fileOverview Generates job recommendations based on resume analysis from multiple specified platforms.
  *
  * - getJobRecommendations - A function that handles the job recommendation process.
  * - JobRecommenderInput - The input type for the getJobRecommendations function.
@@ -25,14 +25,15 @@ const RecommendedJobSchemaRequired = z.object({
   location: z.string().optional().describe('The job location. Prioritize locations in India like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy if applicable, or as indicated by resume.'),
   keyRequiredSkills: z.array(z.string()).describe('A list of 3-5 key skills required for the job, directly from the job posting if possible. This field is mandatory.'),
   description: z.string().describe('A short job description (2-3 sentences) summarizing the role and its key responsibilities. This field is mandatory.'),
-  applicationLink: z.string().describe('A direct application link for the job, preferably from LinkedIn, Indeed, Naukri, or SimplyHired. This field is mandatory.'), // format: 'url' was removed due to previous errors
+  applicationLink: z.string().describe('A direct application link for the job. This field is mandatory.'),
   matchScore: z.number().min(0).max(100).describe('A score from 0 to 100 indicating how well the job aligns with the candidate’s skills and experience. This field is mandatory.'),
+  platform: z.string().describe('The platform where the job was found (e.g., LinkedIn, Naukri, Indeed, SimplyHired, Glassdoor). This field is mandatory.'),
 });
 const RecommendedJobSchemaLax = RecommendedJobSchemaRequired.partial();
 
 
 const JobRecommenderOutputSchema = z.object({
-  jobs: z.array(RecommendedJobSchemaRequired).min(0).max(10).describe('A list of up to 10 recommended jobs. Prioritize jobs that closely match the candidate’s most recent experience and top skills. Locations in India like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy should be considered if relevant. Match score should be 50% or higher for inclusion. If no jobs meet the criteria, return an empty array.'),
+  jobs: z.array(RecommendedJobSchemaRequired).min(0).max(20).describe('A list of up to 15-20 recommended jobs (aiming for 3 from each specified platform). Prioritize jobs that closely match the candidate’s most recent experience and top skills. Locations in India like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy should be considered if relevant. Match score should be 50% or higher for inclusion. If no jobs meet the criteria, return an empty array.'),
 });
 export type JobRecommenderOutput = z.infer<typeof JobRecommenderOutputSchema>;
 export type RecommendedJob = z.infer<typeof RecommendedJobSchemaRequired>;
@@ -47,7 +48,16 @@ const jobRecommenderPrompt = ai.definePrompt({
   input: {schema: JobRecommenderInputSchema},
   output: {schema: z.object({jobs: z.array(RecommendedJobSchemaLax).min(0)})}, 
   prompt: `You are an expert AI career advisor and job recommender.
-Analyze the candidate's resume details (skills, most recent experience, projects). Based on this, recommend relevant job openings. Prioritize jobs that closely match the candidate’s most recent experience and top skills, and have a match score of 50% or higher.
+Analyze the candidate's resume details (skills, most recent experience, projects). Based on this, recommend relevant job openings.
+You MUST provide 3 job recommendations from EACH of the following platforms:
+- LinkedIn
+- Naukri
+- Indeed
+- SimplyHired
+- Glassdoor
+This should result in a total of 15 job recommendations.
+
+Prioritize jobs that closely match the candidate’s most recent experience and top skills, and have a match score of 50% or higher.
 Prioritize jobs located in India, specifically in cities like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy, if these align with the profile or are generally suitable.
 
 For each job recommendation, you MUST provide:
@@ -56,8 +66,9 @@ For each job recommendation, you MUST provide:
 3.  **Location**: (e.g., "Chennai, India", "Remote"). This field is mandatory.
 4.  **Key Required Skills**: A list of 3-5 key skills explicitly mentioned in the job requirements (e.g., ["Python", "SQL", "AWS"]). This field is mandatory.
 5.  **Short Job Description**: A concise summary (2-3 sentences) of the job's main responsibilities and purpose. This field is mandatory.
-6.  **Application Link**: A direct, functional URL to the job application page, preferably from LinkedIn, Indeed, Naukri, or SimplyHired. This field is mandatory and must be a valid URL.
+6.  **Application Link**: A direct, functional URL to the job application page. This field is mandatory and must be a valid URL.
 7.  **Match Score**: A percentage (0-100) representing the alignment of the job with the candidate's skills and experience (especially recent experience). This field is mandatory. Ensure this score is 50 or higher.
+8.  **Platform**: The name of the job platform from which this job was sourced (LinkedIn, Naukri, Indeed, SimplyHired, or Glassdoor). This field is mandatory.
 
 Resume Details:
 Top Skills: {{#if skills}}{{#each skills}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}No specific skills listed.{{/if}}
@@ -72,12 +83,11 @@ Projects Summary (if relevant):
 User's Stated Target Role (consider this but prioritize resume content): {{{targetRole}}}
 {{/if}}
 
-Focus on providing high-quality, actionable recommendations. Ensure all fields are populated correctly. If a suitable application link from LinkedIn, Indeed, Naukri, or SimplyHired cannot be found, you may use a general careers page link for the company if a specific role matching the description is likely listed there, but prioritize direct job links.
-The 'keyRequiredSkills' should be derived from typical requirements for such a role if not explicitly available for a general link.
-
+Focus on providing high-quality, actionable recommendations. Ensure all fields are populated correctly.
 Output strictly in the defined JSON schema. Only include jobs if you can provide all mandatory fields and the match score is 50% or higher.
-Your primary goal is to provide relevant job suggestions if the candidate's resume indicates skills. Aim for at least 1-3 strong matches even if more cannot be found. If skills are very sparse or not clearly defined in the resume, it is acceptable to return an empty 'jobs' array.
-The number of jobs can be up to 10.
+Aim for a total of 15 job recommendations. If finding 3 suitable jobs (match score >= 50%) from a specific platform is exceptionally difficult, provide as many as possible for that platform, but ensure diversity and relevance in the overall set of jobs.
+If skills are very sparse or not clearly defined in the resume, and you cannot meet the 50% match score or find sufficient jobs, it is acceptable to return a smaller number of high-quality jobs, or an empty 'jobs' array if no suitable matches are found.
+The number of jobs should be ideally 15.
 `,
 });
 
@@ -152,6 +162,8 @@ const jobRecommenderFlow = ai.defineFlow(
         continue;
       }
 
+      const platform = (currentJob.platform && currentJob.platform.trim() !== "") ? currentJob.platform.trim() : "Unknown Platform";
+
       processedJobs.push({
         title,
         company,
@@ -160,10 +172,13 @@ const jobRecommenderFlow = ai.defineFlow(
         description,
         applicationLink,
         matchScore,
+        platform,
       });
     }
     
-    const finalJobs = processedJobs.slice(0, 10); 
+    // Aim for up to 15 jobs, but LLM might return more or less based on prompt.
+    // Max specified in output schema is 20, so slice to 15 if more are valid.
+    const finalJobs = processedJobs.slice(0, 15); 
 
     return { jobs: finalJobs };
   }

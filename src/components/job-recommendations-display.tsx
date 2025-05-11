@@ -5,7 +5,7 @@ import type { JobRecommenderOutput, RecommendedJob } from '@/ai/flows/job-recomm
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Briefcase, Building, ExternalLink, Target, MapPin, Percent, ListChecks } from 'lucide-react';
+import { Briefcase, Building, ExternalLink, Target, MapPin, Percent, ListChecks, Layers } from 'lucide-react'; // Added Layers for platform
 import {Progress} from "@/components/ui/progress";
 
 interface JobRecommendationsDisplayProps {
@@ -23,7 +23,7 @@ export function JobRecommendationsDisplay({ recommendations }: JobRecommendation
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">No job recommendations available at this time. Try adjusting your resume or criteria.</p>
+          <p className="text-muted-foreground">No job recommendations available at this time. Try adjusting your resume or criteria. Ensure your resume score is 50 or above.</p>
         </CardContent>
       </Card>
     );
@@ -39,7 +39,7 @@ export function JobRecommendationsDisplay({ recommendations }: JobRecommendation
             </span>
             <div>
               <CardTitle className="text-2xl font-bold text-accent">AI Suggested Job Matches</CardTitle>
-              <CardDescription>Based on your resume, here are some potential job opportunities. Locations prioritized for India (Chennai, Bangalore, Hyderabad, Coimbatore, Trichy) if relevant.</CardDescription>
+              <CardDescription>Based on your resume, here are some potential job opportunities. Aiming for diversity across platforms like LinkedIn, Naukri, Indeed, SimplyHired, and Glassdoor. Locations prioritized for India.</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -57,6 +57,12 @@ export function JobRecommendationsDisplay({ recommendations }: JobRecommendation
                         <div className="text-xs text-muted-foreground mt-1 flex items-center">
                             <MapPin className="h-3.5 w-3.5 mr-1.5 text-muted-foreground shrink-0" />
                             {job.location}
+                        </div>
+                    )}
+                     {job.platform && (
+                        <div className="text-xs text-muted-foreground mt-1 flex items-center">
+                            <Layers className="h-3.5 w-3.5 mr-1.5 text-muted-foreground shrink-0" />
+                            Source: {job.platform}
                         </div>
                     )}
                   </div>
