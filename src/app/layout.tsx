@@ -1,7 +1,7 @@
 import type {Metadata} from 'next';
 import {Geist, Geist_Mono} from 'next/font/google';
 import Link from 'next/link';
-import { Briefcase, Home, Sparkles, PanelLeft } from 'lucide-react';
+import { Briefcase, Home, Sparkles, PanelLeft, UserCircle } from 'lucide-react'; // Added UserCircle
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import {
@@ -16,9 +16,6 @@ import {
   SidebarTrigger,
   SidebarFooter,
 } from '@/components/ui/sidebar';
-// Button component is not directly used here anymore for trigger, SidebarTrigger handles it.
-// import { Button } from '@/components/ui/button';
-
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -43,8 +40,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <SidebarProvider defaultOpen={false}> {/* Sidebar starts hidden, cookie persists state */}
-          <Sidebar> {/* collapsible defaults to "offcanvas" */}
+        <SidebarProvider defaultOpen={false}>
+          <Sidebar>
             <SidebarHeader className="p-4 flex items-center gap-2">
               <Sparkles className="w-8 h-8 text-primary" />
               <h1 className="text-2xl font-bold text-primary">
@@ -55,8 +52,15 @@ export default function RootLayout({
               <SidebarMenu>
                 <SidebarMenuItem>
                   <Link href="/" legacyBehavior passHref>
-                    <SidebarMenuButton asChild variant="default" size="default" tooltip="Go to Home page">
-                      <a><Home /> Home</a>
+                    <SidebarMenuButton asChild variant="default" size="default" tooltip="Go to Home Portal">
+                      <a><Home /> Home Portal</a>
+                    </SidebarMenuButton>
+                  </Link>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <Link href="/candidate-portal" legacyBehavior passHref>
+                    <SidebarMenuButton asChild variant="default" size="default" tooltip="Access Candidate Tools">
+                       <a><UserCircle /> Candidate Portal</a>
                     </SidebarMenuButton>
                   </Link>
                 </SidebarMenuItem>
@@ -95,10 +99,9 @@ export default function RootLayout({
                     <PanelLeft className="h-5 w-5"/>
                     <span className="sr-only">Toggle Sidebar</span>
                 </SidebarTrigger>
-                {/* Optional: breadcrumbs or page title could go here for desktop header */}
             </header>
 
-            <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
+            <main className="flex-1">{children}</main> {/* Removed p-4 md:p-6 lg:p-8 to allow pages to control their own padding */}
             <Toaster />
           </SidebarInset>
         </SidebarProvider>
