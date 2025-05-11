@@ -5,7 +5,7 @@ import type { JobRecommenderOutput, RecommendedJob } from '@/ai/flows/job-recomm
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Briefcase, Building, ExternalLink, LinkIcon, Percent, Search, Target } from 'lucide-react';
+import { Briefcase, Building, ExternalLink, LinkIcon, Percent, Search, Target, MapPin } from 'lucide-react';
 import {Progress} from "@/components/ui/progress";
 
 interface JobRecommendationsDisplayProps {
@@ -53,7 +53,7 @@ export function JobRecommendationsDisplay({ recommendations }: JobRecommendation
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">No job recommendations available at this time.</p>
+          <p className="text-muted-foreground">No job recommendations available at this time. Try adjusting your resume or criteria.</p>
         </CardContent>
       </Card>
     );
@@ -69,7 +69,7 @@ export function JobRecommendationsDisplay({ recommendations }: JobRecommendation
             </span>
             <div>
               <CardTitle className="text-2xl font-bold text-accent">AI Suggested Job Matches</CardTitle>
-              <CardDescription>Based on your resume, here are some potential job opportunities.</CardDescription>
+              <CardDescription>Based on your resume, here are some potential job opportunities. Locations prioritized for India (Chennai, Bangalore, Hyderabad, Coimbatore, Trichy).</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -77,12 +77,18 @@ export function JobRecommendationsDisplay({ recommendations }: JobRecommendation
           {recommendations.jobs.map((job, index) => (
             <Card key={index} className="bg-card/80 backdrop-blur-sm shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
+                <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-2">
+                  <div className='flex-grow'>
                     <CardTitle className="text-xl text-primary">{job.title}</CardTitle>
                     <CardDescription className="text-base text-muted-foreground">{job.company}</CardDescription>
+                    {job.location && (
+                        <div className="text-xs text-muted-foreground mt-1 flex items-center">
+                            <MapPin className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                            {job.location}
+                        </div>
+                    )}
                   </div>
-                  <div className="text-right">
+                  <div className="text-left sm:text-right mt-2 sm:mt-0 flex-shrink-0">
                      <Badge variant="secondary" className="text-sm flex items-center">
                         <Percent className="h-4 w-4 mr-1.5" />
                         {(job.relevanceScore * 100).toFixed(0)}% Match
@@ -103,10 +109,11 @@ export function JobRecommendationsDisplay({ recommendations }: JobRecommendation
             </Card>
           ))}
            <p className="text-xs text-center text-muted-foreground pt-4">
-            Note: These are AI-generated suggestions. Please verify job details on the respective platforms.
+            Note: These are AI-generated suggestions. Please verify job details on the respective platforms. Relevance score indicates match to resume.
           </p>
         </CardContent>
       </Card>
     </div>
   );
 }
+
