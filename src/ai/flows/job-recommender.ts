@@ -33,7 +33,7 @@ const RecommendedJobSchemaLax = RecommendedJobSchemaRequired.partial();
 
 
 const JobRecommenderOutputSchema = z.object({
-  jobs: z.array(RecommendedJobSchemaRequired).min(0).max(10).describe('A list of up to 10 recommended jobs (aiming for at least 5). Prioritize jobs that closely match the candidate’s most recent experience and top skills. Locations in India like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy should be considered if relevant. Match score should be 50% or higher for inclusion. If no jobs meet the criteria, return an empty array.'),
+  jobs: z.array(RecommendedJobSchemaRequired).min(0).max(10).describe('A list of up to 10 recommended jobs (aiming for at least 5). Prioritize jobs that closely match the candidate’s most recent experience and top skills. Locations in India like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy should be considered if relevant. Match score should be 30% or higher for inclusion. If no jobs meet the criteria, return an empty array.'),
 });
 export type JobRecommenderOutput = z.infer<typeof JobRecommenderOutputSchema>;
 export type RecommendedJob = z.infer<typeof RecommendedJobSchemaRequired>;
@@ -49,7 +49,7 @@ const jobRecommenderPrompt = ai.definePrompt({
   output: {schema: z.object({jobs: z.array(RecommendedJobSchemaLax).min(0)})}, 
   prompt: `You are a job recommendation assistant.
 Given the following resume details, first extract relevant skills, experience, and job roles.
-Then fetch or generate at least 5 job recommendations from publicly available job portals (like LinkedIn, Indeed, Glassdoor, or SimplyHired) that closely match the candidate’s profile.
+Then, generate 5 to 10 job recommendations. It is crucial to source these recommendations from a DIVERSE set of publicly available job portals. Specifically, try to include jobs from LinkedIn, Naukri, Indeed, Glassdoor, and SimplyHired. Aim to feature jobs from at least 3-4 different platforms if suitable matches are found.
 Prioritize jobs that closely match the candidate’s most recent experience and top skills.
 Prioritize jobs located in India, specifically in cities like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy, if these align with the profile or are generally suitable.
 
@@ -59,9 +59,9 @@ Each recommendation MUST include:
 - Location (this field is mandatory)
 - Required Skills (a list of 3-5 key skills directly from the job posting if possible)
 - Short Job Description (2-3 sentences summarizing the role and its key responsibilities)
-- Match Score (a percentage from 0 to 100, indicating how well the job aligns with the candidate’s skills and experience. This score should be 50% or higher for inclusion.)
+- Match Score (a percentage from 0 to 100, indicating how well the job aligns with the candidate’s skills and experience. This score should be 30% or higher for inclusion.)
 - Direct Job Link (real or dummy if scraping is not active, ensure it's a valid URL format)
-- Platform (The name of the job portal where this job was sourced, e.g., LinkedIn, Indeed, Glassdoor, SimplyHired)
+- Platform (The name of the job portal where this job was sourced, e.g., LinkedIn, Naukri, Indeed, Glassdoor, SimplyHired. This field is mandatory.)
 
 Resume Details:
 Top Skills: {{#if skills}}{{#each skills}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}No specific skills listed.{{/if}}
@@ -76,9 +76,9 @@ Projects Summary (if relevant):
 User's Stated Target Role (consider this but prioritize resume content): {{{targetRole}}}
 {{/if}}
 
-Output strictly in the defined JSON schema. Only include jobs if you can provide all mandatory fields and the match score is 50% or higher.
-If, due to sparse resume details or lack of suitable matches, you cannot find at least 5 jobs meeting these criteria, it is acceptable to return fewer high-quality jobs, or an empty 'jobs' array.
-The number of jobs should ideally be between 5 and 10.
+Output strictly in the defined JSON schema. Only include jobs if you can provide all mandatory fields and the match score is 30% or higher.
+If, due to sparse resume details or lack of suitable matches, you cannot find 5-10 jobs meeting these criteria, it is acceptable to return fewer high-quality jobs, or an empty 'jobs' array.
+Ensure the 'Platform' field is accurately populated for each job.
 `,
 });
 
@@ -153,8 +153,8 @@ const jobRecommenderFlow = ai.defineFlow(
       
       const matchScore = (typeof currentJob.matchScore === 'number' && currentJob.matchScore >= 0 && currentJob.matchScore <= 100) ? currentJob.matchScore : 0;
       
-      if (matchScore < 50) {
-        console.warn(`JobRecommenderFlow: Skipping job "${title}" due to match score ${matchScore} < 50.`);
+      if (matchScore < 30) { // Ensure this matches the prompt's threshold
+        console.warn(`JobRecommenderFlow: Skipping job "${title}" due to match score ${matchScore} < 30.`);
         continue;
       }
 
@@ -178,4 +178,3 @@ const jobRecommenderFlow = ai.defineFlow(
     return { jobs: finalJobs };
   }
 );
-
