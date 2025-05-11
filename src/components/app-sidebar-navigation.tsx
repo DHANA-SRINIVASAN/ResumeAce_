@@ -2,11 +2,10 @@
 'use client';
 
 import Link from 'next/link';
-import { Briefcase, Home, UserCircle, LogIn, LogOut, UserPlus, Sparkles } from 'lucide-react'; // Added Sparkles
+import { Briefcase, Home, UserCircle, LogIn, LogOut, UserPlus, Sparkles } from 'lucide-react'; 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarHeader, SidebarFooter, SidebarContent } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
-import { Button } from './ui/button'; // For logout button
-import { Skeleton } from './ui/skeleton'; // For loading state
+import { Skeleton } from './ui/skeleton'; 
 
 export function AppSidebarNavigation() {
   const { isLoggedIn, logout, isLoading } = useAuth();
@@ -53,13 +52,13 @@ export function AppSidebarNavigation() {
         </SidebarHeader>
         <SidebarContent>
             <SidebarMenu>
-            <SidebarMenuItem>
-                <Link href="/" legacyBehavior passHref>
-                <SidebarMenuButton asChild variant="default" size="default" tooltip="Go to Home">
-                    <a><Home /> Home</a>
-                </SidebarMenuButton>
-                </Link>
-            </SidebarMenuItem>
+                <SidebarMenuItem>
+                    <Link href="/" legacyBehavior passHref>
+                    <SidebarMenuButton asChild variant="default" size="default" tooltip="Go to Home">
+                        <a><Home /> Home</a>
+                    </SidebarMenuButton>
+                    </Link>
+                </SidebarMenuItem>
 
             {isLoggedIn ? (
                 <>
@@ -111,4 +110,3 @@ export function AppSidebarNavigation() {
     </>
   );
 }
-
