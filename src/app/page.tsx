@@ -88,7 +88,7 @@ export default function HomePage() {
       analysisSteps.push({ stage: "Resume Scoring", status: "Completed" });
 
 
-      if (scoreData.score >= 50) {
+      if (scoreData.score >= 30) { // Updated threshold to 30
         setCurrentStage("Fetching job recommendations...");
         // Try to infer a target role from the most recent experience for better job recs
         let inferredTargetRole : string | undefined = undefined;
@@ -114,7 +114,7 @@ export default function HomePage() {
         setJobRecommendations(jobRecs);
         analysisSteps.push({ stage: "Job Recommendations", status: "Completed" });
       } else {
-         analysisSteps.push({ stage: "Job Recommendations", status: "Skipped (Score < 50)" });
+         analysisSteps.push({ stage: "Job Recommendations", status: `Skipped (Score < 30)` });
       }
 
     } catch (err) {
@@ -183,7 +183,7 @@ export default function HomePage() {
             <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-6 mb-6">
                 <TabsTrigger value="analysis" className="flex items-center gap-2"><FileText size={18}/>Analysis</TabsTrigger>
                 <TabsTrigger value="feedback" className="flex items-center gap-2"><Bot size={18}/>AI Chat</TabsTrigger>
-                <TabsTrigger value="jobs" className="flex items-center gap-2" disabled={!jobRecommendations && scoreResult && scoreResult.score < 50}><Target size={18}/>Jobs</TabsTrigger>
+                <TabsTrigger value="jobs" className="flex items-center gap-2" disabled={!jobRecommendations && scoreResult && scoreResult.score < 30}><Target size={18}/>Jobs</TabsTrigger>
                 <TabsTrigger value="roadmap" className="flex items-center gap-2"><MapPinned size={18}/>Roadmap</TabsTrigger>
                 <TabsTrigger value="bias" className="flex items-center gap-2"><Filter size={18}/>Bias Check</TabsTrigger>
                 <TabsTrigger value="courses" className="flex items-center gap-2"><BookOpen size={18}/>Courses</TabsTrigger>
@@ -200,13 +200,13 @@ export default function HomePage() {
             </TabsContent>
             <TabsContent value="jobs">
                  {jobRecommendations && <JobRecommendationsDisplay recommendations={jobRecommendations} />}
-                 {!jobRecommendations && scoreResult && scoreResult.score < 50 && (
+                 {!jobRecommendations && scoreResult && scoreResult.score < 30 && (
                     <Card className="shadow-md">
                         <CardHeader>
                             <CardTitle>Job Recommendations Locked</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-muted-foreground">Improve your resume score to 50 or above to unlock job recommendations.</p>
+                            <p className="text-muted-foreground">Improve your resume score to 30 or above to unlock job recommendations.</p>
                         </CardContent>
                     </Card>
                  )}
@@ -256,7 +256,7 @@ export default function HomePage() {
                     <ul className="list-disc list-inside pl-4 space-y-1">
                         <li><span className="font-medium">Analysis:</span> Parsed data & score.</li>
                         <li><span className="font-medium">AI Chat:</span> Ask questions about your resume.</li>
-                        <li><span className="font-medium">Jobs:</span> Recommendations (if score ≥ 50).</li>
+                        <li><span className="font-medium">Jobs:</span> Recommendations (if score ≥ 30).</li> 
                         <li><span className="font-medium">Roadmap:</span> Career plan to your target role.</li>
                         <li><span className="font-medium">Bias Check:</span> Inclusivity suggestions.</li>
                         <li><span className="font-medium">Courses:</span> Learning resources.</li>
@@ -281,3 +281,4 @@ export default function HomePage() {
     </div>
   );
 }
+

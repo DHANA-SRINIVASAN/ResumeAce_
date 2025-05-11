@@ -23,7 +23,7 @@ export function JobRecommendationsDisplay({ recommendations }: JobRecommendation
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">No job recommendations available at this time. Try adjusting your resume or criteria. Ensure your resume score is 50 or above.</p>
+          <p className="text-muted-foreground">No job recommendations available at this time. Try adjusting your resume or criteria. Ensure your resume score is 30 or above.</p>
         </CardContent>
       </Card>
     );
@@ -105,3 +105,4 @@ export function JobRecommendationsDisplay({ recommendations }: JobRecommendation
     </div>
   );
 }
+
