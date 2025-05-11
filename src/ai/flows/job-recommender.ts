@@ -46,27 +46,29 @@ export async function getJobRecommendations(input: JobRecommenderInput): Promise
 const jobRecommenderPrompt = ai.definePrompt({
   name: 'jobRecommenderPrompt',
   input: {schema: JobRecommenderInputSchema},
+  // Output schema for the prompt allows for partial data, post-processing will enforce stricter rules.
   output: {schema: z.object({jobs: z.array(RecommendedJobSchemaLax).min(0)})}, 
-  prompt: `You are a job recommendation assistant. Your task is to act as an expert job sourcer.
-Using the candidate's 'Top Skills' as the **primary search criteria**, find relevant job openings from a diverse set of online job portals.
-While considering recent experience and target role, the skill match with 'Top Skills' is paramount.
+  prompt: `You are an expert job recommendation assistant and an adept job sourcer.
+Your primary goal is to find relevant job openings based on the candidate's 'Top Skills'. This is the most important factor.
+Also consider their recent experience and any target role mentioned.
 
-Generate 5 to 10 job recommendations.
-Crucially, you **must** simulate sourcing these jobs from different platforms. For the 'platform' field in your output, use specific names like 'LinkedIn', 'Naukri', 'Indeed', 'Glassdoor', or 'SimplyHired'. Provide a variety of platforms in your recommendations, aiming for at least 3-4 distinct sources if suitable jobs are found.
+Your task is to generate job recommendations. Aim for 5 to 10 diverse recommendations, but **it is crucial to provide any suitable matches you find, even if fewer than 5.** Returning some valid job entries is highly preferred over returning an empty list.
+
+**For EVERY job recommendation you provide, you MUST include ALL of the following fields:**
+- Job Title (e.g., "Software Engineer")
+- Company Name (e.g., "Tech Solutions Inc.")
+- Location (e.g., "Chennai, India", "Remote"). This field is mandatory.
+- Key Required Skills (a list of 3-5 skills, e.g., ["Java", "Spring Boot", "SQL"])
+- Short Job Description (2-3 sentences summarizing the role)
+- Match Score (a percentage from 0 to 100, heavily reflecting skill alignment with the candidate's 'Top Skills')
+- Direct Job Link (a plausible URL, e.g., https://www.linkedin.com/jobs/view/12345)
+- Platform (The job portal name, e.g., "LinkedIn", "Naukri", "Indeed", "Glassdoor", "SimplyHired")
+
+Simulate sourcing these jobs from a variety of platforms. Aim for at least 3-4 distinct platform sources in your recommendations if suitable jobs are found.
 Prioritize jobs located in India, specifically in cities like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy, if these align with the profile or are generally suitable.
 
-Each recommendation MUST include:
-- Job Title
-- Company Name
-- Location (this field is mandatory)
-- Required Skills (a list of 3-5 key skills directly from the job posting if possible)
-- Short Job Description (2-3 sentences summarizing the role and its key responsibilities)
-- Match Score (a percentage from 0 to 100, indicating how well the job aligns with the candidate’s skills and experience. This score MUST heavily reflect the skill alignment with the candidate's 'Top Skills'.)
-- Direct Job Link (real or plausible dummy if scraping is not active, ensure it's a valid URL format like https://example.com/job/123)
-- Platform (The name of the job portal where this job was sourced, e.g., LinkedIn, Naukri, Indeed, Glassdoor, SimplyHired. This field is mandatory.)
-
-Resume Details:
-Top Skills: {{#if skills}}{{#each skills}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}No specific skills listed.{{/if}}
+Candidate's Resume Details:
+Top Skills: {{#if skills}}{{#each skills}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}No specific skills listed. Your ability to find jobs will be limited without skills.{{/if}}
 Most Recent Experience Summary: {{{experienceSummary}}}
 {{#if projectsSummary}}
 Projects Summary (if relevant):
@@ -78,8 +80,9 @@ Projects Summary (if relevant):
 User's Stated Target Role (consider this, but skill match is the primary driver): {{{targetRole}}}
 {{/if}}
 
-Output strictly in the defined JSON schema. Only include jobs if you can provide all mandatory fields and the match score is 30% or higher.
-If, due to sparse resume details or lack of suitable matches, you cannot find 5-10 jobs meeting these criteria, it is acceptable to return fewer high-quality jobs, or an empty 'jobs' array.
+Output strictly in the defined JSON schema. 
+**Only include jobs in the output array if they have a matchScore of 30% or higher AND all mandatory fields listed above are present.**
+If no jobs meet these criteria even after a thorough search, you may return an empty 'jobs' array.
 Ensure the 'Platform' field is accurately populated for each job.
 `,
 });
@@ -180,4 +183,5 @@ const jobRecommenderFlow = ai.defineFlow(
     return { jobs: finalJobs };
   }
 );
+
 
