@@ -52,14 +52,21 @@ const jobRecommenderPrompt = ai.definePrompt({
   output: {schema: z.object({jobs: z.array(RecommendedJobSchemaLax)})}, 
   prompt: `You are an expert career advisor and job recommender. Your primary goal is to provide highly relevant job suggestions based *directly* on the candidate's resume details.
 
-First, carefully analyze the provided Resume Details (Skills, Experience Summary, and Projects Summary). Identify the 2-3 most prominent skills, technologies, or experience areas mentioned.
+Your first task is to meticulously analyze the 'Resume Details' (Skills, Experience Summary, Projects Summary).
+From this analysis, identify the 3-5 most dominant and recurring skills, technologies, or experience themes. These themes will be the foundation for your job recommendations.
 
-Then, based on these *identified prominent areas*, suggest 3-5 job roles. For each and every job role, you MUST provide:
-1.  A plausible job title (the 'title' field). This title *must directly reflect* the candidate's primary skills and experience. For example, if the resume highlights "Python, Django, and API development," a relevant title would be "Python Django Developer" or "Backend API Engineer," not a generic "Software Engineer" unless that's the best fit given extensive experience. This is an absolutely critical and mandatory field. Without a title clearly aligned with the resume's core strengths, the recommendation is useless. If you cannot confidently generate a valid, non-empty, and *relevant* title, omit that entire job entry.
-2.  A plausible company name (the 'company' field). This is mandatory. You can suggest well-known companies or generic but realistic company names (e.g., "Innovatech Solutions", "DataDriven Corp").
-3.  A brief description (1-2 sentences) explaining *specifically* why this job is a good fit for the candidate. This description MUST explicitly reference the candidate's skills and experience from their resume and connect them to the job's requirements. For example: "This Backend Developer role at Innovatech Solutions is a strong match due to your listed proficiency in Python, Django, and experience in building RESTful APIs, as detailed in your project work." This field is mandatory.
-4.  A relevance score (a number between 0.0 and 1.0) indicating how relevant *this specific job title and description* are to the *provided resume details*. A score of 1.0 means a perfect match for the resume's core strengths. This field is mandatory.
-5.  Suggested search URLs for finding similar jobs on LinkedIn, Naukri, Indeed, and Glassdoor (the 'suggestedSearchLinks' object with its respective string fields). These URLs should be functional search queries based on the *specific job title and potentially key skills*. For example, for LinkedIn: 'https://www.linkedin.com/jobs/search/?keywords=Python%20Django%20Developer&location=REMOTE' or similar constructive search links. This 'suggestedSearchLinks' object is mandatory. Even if specific links are hard to generate, provide valid default search query URLs for each platform based on the job title.
+For each identified theme, formulate a job recommendation. The 'title' of each job *must directly derive* from these themes and the specific language used in the resume. For example, if the resume heavily features "React development, UI/UX design, and agile methodologies," a relevant job title could be "React Frontend Developer" or "UI Developer with React." Avoid generic titles like "Software Engineer" unless the resume's breadth and depth overwhelmingly support such a general role. If the resume is highly specialized (e.g., "Quantitative Analyst with Python and C++ for HFT"), the job title should reflect this specialization.
+
+{{#if targetRole}}
+The user has expressed an interest in the role: '{{{targetRole}}}'. If this target role aligns well with the dominant themes you identified from the resume, prioritize recommendations related to it. However, if '{{{targetRole}}}' significantly diverges from the resume's content, you must still base your primary recommendations on the resume's actual skills and experience. The core job recommendations must be grounded in the resume.
+{{/if}}
+
+For each and every job role, you MUST provide:
+1.  **Title**: (As described above) This field is absolutely critical and mandatory. If you cannot confidently generate a valid, non-empty, and *relevant* title based on the resume's themes, omit that entire job entry.
+2.  **Company**: A plausible company name (e.g., "Tech Solutions Inc.", "Innovatech", or a well-known company if appropriate). This is mandatory.
+3.  **Description**: This description (1-3 sentences) MUST explicitly reference specific skills, phrases from the 'Experience Summary', or details from 'Projects Summary' from the provided resume to justify why this job is a strong match. For example: "This 'React Frontend Developer' role at 'Innovatech' is an excellent fit given your demonstrated expertise in 'React development' and 'UI/UX design principles' mentioned in your skills, and your project experience in 'building responsive web applications with React' as detailed in your Projects Summary." Generic descriptions are unacceptable. This field is mandatory.
+4.  **Relevance Score**: A number between 0.0 and 1.0 indicating how relevant *this specific job title and description* are to the *provided resume details*. A score of 1.0 means a perfect match for the resume's core strengths. This field is mandatory.
+5.  **Suggested Search Links**: An object containing optional string URLs for LinkedIn, Naukri, Indeed, and Glassdoor. These URLs should be functional search queries based on the *specific job title and potentially key skills*. For example, for LinkedIn: 'https://www.linkedin.com/jobs/search/?keywords=Python%20Django%20Developer&location=REMOTE'. This 'suggestedSearchLinks' object is mandatory, even if individual links are not always generatable (provide valid default search query URLs for each platform based on the job title if specific ones cannot be formed).
 
 Resume Details:
 Skills: {{#if skills}}{{#each skills}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}No specific skills listed.{{/if}}
@@ -70,11 +77,10 @@ Projects Summary:
 - {{{this}}}
 {{/each}}
 {{/if}}
-{{#if targetRole}}Target Role Preference (consider this, but prioritize direct resume alignment): {{{targetRole}}}{{/if}}
 
-Generate recommendations that are diverse if the resume supports multiple paths, but always prioritize direct relevance to the resume's content.
-Ensure ALL required fields, especially 'title', 'company', 'description', 'relevanceScore', and 'suggestedSearchLinks', are present for *every* job object in the 'jobs' array.
-The output must strictly adhere to the JSON schema, paying close attention to required fields for each job object. The 'title' and 'description' relevance is paramount.
+Generate 3-5 recommendations. Prioritize direct relevance to the resume's content.
+Ensure ALL required fields ('title', 'company', 'description', 'relevanceScore', and 'suggestedSearchLinks') are present for *every* job object in the 'jobs' array.
+The output must strictly adhere to the JSON schema. The 'title' and 'description' relevance is paramount.
 Do not include job entries if they lack a valid 'title' or a description that clearly links to the resume content.
 `,
 });
@@ -146,3 +152,4 @@ const jobRecommenderFlow = ai.defineFlow(
     return { jobs: processedJobs };
   }
 );
+
