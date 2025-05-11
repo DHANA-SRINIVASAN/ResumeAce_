@@ -32,7 +32,7 @@ const RecommendedJobSchemaLax = RecommendedJobSchemaRequired.partial();
 
 
 const JobRecommenderOutputSchema = z.object({
-  jobs: z.array(RecommendedJobSchemaRequired).min(5).max(10).describe('A list of 5-10 recommended jobs. Prioritize jobs that closely match the candidate’s most recent experience and top skills. Locations in India like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy should be considered if relevant. Match score should be 50% or higher for inclusion.'),
+  jobs: z.array(RecommendedJobSchemaRequired).min(0).max(10).describe('A list of up to 10 recommended jobs. Prioritize jobs that closely match the candidate’s most recent experience and top skills. Locations in India like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy should be considered if relevant. Match score should be 50% or higher for inclusion. If no jobs meet the criteria, return an empty array.'),
 });
 export type JobRecommenderOutput = z.infer<typeof JobRecommenderOutputSchema>;
 export type RecommendedJob = z.infer<typeof RecommendedJobSchemaRequired>;
@@ -45,9 +45,9 @@ export async function getJobRecommendations(input: JobRecommenderInput): Promise
 const jobRecommenderPrompt = ai.definePrompt({
   name: 'jobRecommenderPrompt',
   input: {schema: JobRecommenderInputSchema},
-  output: {schema: z.object({jobs: z.array(RecommendedJobSchemaLax)})}, 
+  output: {schema: z.object({jobs: z.array(RecommendedJobSchemaLax).min(0)})}, // Allow empty array from LLM, min 0
   prompt: `You are an expert AI career advisor and job recommender.
-Analyze the candidate's resume details (skills, most recent experience, projects). Based on this, recommend 5-10 relevant job openings. Prioritize jobs that closely match the candidate’s most recent experience and top skills, and have a match score of 50% or higher.
+Analyze the candidate's resume details (skills, most recent experience, projects). Based on this, recommend up to 10 relevant job openings. Prioritize jobs that closely match the candidate’s most recent experience and top skills, and have a match score of 50% or higher.
 Prioritize jobs located in India, specifically in cities like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy, if these align with the profile or are generally suitable.
 
 For each job recommendation, you MUST provide:
@@ -75,7 +75,7 @@ User's Stated Target Role (consider this but prioritize resume content): {{{targ
 Focus on providing high-quality, actionable recommendations. Ensure all fields are populated correctly. If a suitable application link from LinkedIn, Indeed, Naukri, or SimplyHired cannot be found, you may use a general careers page link for the company if a specific role matching the description is likely listed there, but prioritize direct job links.
 The 'keyRequiredSkills' should be derived from typical requirements for such a role if not explicitly available for a general link.
 Output strictly in the defined JSON schema. Only include jobs if you can provide all mandatory fields and the match score is 50% or higher.
-Include 5-10 jobs.
+Include up to 10 jobs. If you cannot find any jobs that meet all criteria (including match score >= 50%), return an empty array for "jobs".
 `,
 });
 
@@ -160,7 +160,7 @@ const jobRecommenderFlow = ai.defineFlow(
       });
     }
     
-    // Ensure between 5 and 10 jobs, even if it means truncating.
+    // Ensure between 0 and 10 jobs.
     const finalJobs = processedJobs.slice(0, 10); 
 
     return { jobs: finalJobs };
