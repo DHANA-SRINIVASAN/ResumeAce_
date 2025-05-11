@@ -25,7 +25,7 @@ const RecommendedJobSchemaRequired = z.object({
   location: z.string().optional().describe('The job location. Prioritize locations in India like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy if applicable, or as indicated by resume.'),
   keyRequiredSkills: z.array(z.string()).describe('A list of 3-5 key skills required for the job, directly from the job posting if possible. This field is mandatory.'),
   description: z.string().describe('A short job description (2-3 sentences) summarizing the role and its key responsibilities. This field is mandatory.'),
-  applicationLink: z.string().describe('A direct application link for the job, preferably from LinkedIn, Indeed, Naukri, or SimplyHired. This field is mandatory.'),
+  applicationLink: z.string().describe('A direct application link for the job, preferably from LinkedIn, Indeed, Naukri, or SimplyHired. This field is mandatory.'), // format: 'url' was removed due to previous errors
   matchScore: z.number().min(0).max(100).describe('A score from 0 to 100 indicating how well the job aligns with the candidate’s skills and experience. This field is mandatory.'),
 });
 const RecommendedJobSchemaLax = RecommendedJobSchemaRequired.partial();
@@ -45,9 +45,9 @@ export async function getJobRecommendations(input: JobRecommenderInput): Promise
 const jobRecommenderPrompt = ai.definePrompt({
   name: 'jobRecommenderPrompt',
   input: {schema: JobRecommenderInputSchema},
-  output: {schema: z.object({jobs: z.array(RecommendedJobSchemaLax).min(0)})}, // Allow empty array from LLM, min 0
+  output: {schema: z.object({jobs: z.array(RecommendedJobSchemaLax).min(0)})}, 
   prompt: `You are an expert AI career advisor and job recommender.
-Analyze the candidate's resume details (skills, most recent experience, projects). Based on this, recommend up to 10 relevant job openings. Prioritize jobs that closely match the candidate’s most recent experience and top skills, and have a match score of 50% or higher.
+Analyze the candidate's resume details (skills, most recent experience, projects). Based on this, recommend relevant job openings. Prioritize jobs that closely match the candidate’s most recent experience and top skills, and have a match score of 50% or higher.
 Prioritize jobs located in India, specifically in cities like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy, if these align with the profile or are generally suitable.
 
 For each job recommendation, you MUST provide:
@@ -74,8 +74,10 @@ User's Stated Target Role (consider this but prioritize resume content): {{{targ
 
 Focus on providing high-quality, actionable recommendations. Ensure all fields are populated correctly. If a suitable application link from LinkedIn, Indeed, Naukri, or SimplyHired cannot be found, you may use a general careers page link for the company if a specific role matching the description is likely listed there, but prioritize direct job links.
 The 'keyRequiredSkills' should be derived from typical requirements for such a role if not explicitly available for a general link.
+
 Output strictly in the defined JSON schema. Only include jobs if you can provide all mandatory fields and the match score is 50% or higher.
-Include up to 10 jobs. If you cannot find any jobs that meet all criteria (including match score >= 50%), return an empty array for "jobs".
+Your primary goal is to provide relevant job suggestions if the candidate's resume indicates skills. Aim for at least 1-3 strong matches even if more cannot be found. If skills are very sparse or not clearly defined in the resume, it is acceptable to return an empty 'jobs' array.
+The number of jobs can be up to 10.
 `,
 });
 
@@ -89,14 +91,13 @@ const jobRecommenderFlow = ai.defineFlow(
     const llmResponse = await jobRecommenderPrompt(input);
     const rawOutput = llmResponse.output;
 
-
     if (!rawOutput || !rawOutput.jobs) {
       const firstCandidateMessageContent = llmResponse.candidates?.[0]?.message?.content?.[0];
-      const errorDetails = firstCandidateMessageContent?.data ?? firstCandidateMessageContent?.text ?? "No detailed error message available from LLM.";
+      const logMessage = !rawOutput?.jobs ? "LLM returned no/invalid jobs array or structure." : "LLM processing resulted in no jobs data.";
       
-      console.error(
-        "JobRecommenderFlow: Schema validation failed or LLM returned no/invalid jobs array. LLM response content:",
-        JSON.stringify(errorDetails).substring(0, 1000) 
+      console.warn(
+        `JobRecommenderFlow: ${logMessage} LLM response details (if problematic):`,
+        JSON.stringify(firstCandidateMessageContent?.data ?? firstCandidateMessageContent?.text ?? "No detailed error message available from LLM.").substring(0, 1000) 
       );
       if (llmResponse.error) {
         console.error("JobRecommenderFlow: Underlying Genkit error:", llmResponse.error);
@@ -104,6 +105,11 @@ const jobRecommenderFlow = ai.defineFlow(
       return { jobs: [] }; 
     }
     
+    if (rawOutput.jobs.length === 0) {
+        console.info("JobRecommenderFlow: LLM returned an empty jobs array. This may be expected for profiles with sparse skills or no suitable matches found by the LLM.");
+        return { jobs: [] };
+    }
+
     const processedJobs: RecommendedJob[] = [];
 
     for (const job of rawOutput.jobs) {
@@ -126,10 +132,8 @@ const jobRecommenderFlow = ai.defineFlow(
       
       let applicationLink = (currentJob.applicationLink && currentJob.applicationLink.trim() !== "") ? currentJob.applicationLink.trim() : `https://www.google.com/search?q=${encodeURIComponent(title + " " + company + " " + location)}`;
       try {
-        // Basic check if it looks like a URL, actual validation is harder without external libs or more complex regex
         if (!applicationLink.startsWith('http://') && !applicationLink.startsWith('https://')) {
-            // Attempt to fix by prepending https:// if it's a common domain
-            if (applicationLink.includes('.')) { // Simple check for a domain
+            if (applicationLink.includes('.')) { 
                 applicationLink = 'https://' + applicationLink;
             } else {
                  throw new Error("Invalid URL format, cannot auto-correct.");
@@ -143,7 +147,6 @@ const jobRecommenderFlow = ai.defineFlow(
       
       const matchScore = (typeof currentJob.matchScore === 'number' && currentJob.matchScore >= 0 && currentJob.matchScore <= 100) ? currentJob.matchScore : 0;
       
-      // Ensure match score is 50% or higher as per new requirement
       if (matchScore < 50) {
         console.warn(`JobRecommenderFlow: Skipping job "${title}" due to match score ${matchScore} < 50.`);
         continue;
@@ -160,7 +163,6 @@ const jobRecommenderFlow = ai.defineFlow(
       });
     }
     
-    // Ensure between 0 and 10 jobs.
     const finalJobs = processedJobs.slice(0, 10); 
 
     return { jobs: finalJobs };
