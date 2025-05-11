@@ -19,7 +19,7 @@ export function AuthGuard({ children }: AuthGuardProps): ReactNode {
   useEffect(() => {
     // Perform the check only after the initial loading is complete
     if (!isLoading) {
-      constisAuthenticated = checkAuth(); // Get current auth status
+      const isAuthenticated = checkAuth(); // Get current auth status
       if (!isAuthenticated) {
         // Store the current path to redirect back after login
         // Avoid storing if already on login/signup to prevent loops
@@ -43,3 +43,4 @@ export function AuthGuard({ children }: AuthGuardProps): ReactNode {
   // If logged in, render the children
   return children;
 }
+
