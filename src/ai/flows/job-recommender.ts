@@ -10,11 +10,12 @@
 
 import {ai} from '@/ai/genkit';
 import {z}from 'genkit';
-import type { GenerateResponseData } from 'genkit/generate'; // Correct type for prompt output
+import type { GenerateResponseData } from 'genkit/generate'; 
 
 const JobRecommenderInputSchema = z.object({
   skills: z.array(z.string()).describe('A list of skills from the resume.'),
   experienceSummary: z.string().describe('A summary of the work experience from the resume.'),
+  projectsSummary: z.array(z.string()).optional().describe('A list of project descriptions from the resume, which can highlight practical application of skills.'),
   targetRole: z.string().optional().describe('A specific target role the user might be interested in.'),
 });
 export type JobRecommenderInput = z.infer<typeof JobRecommenderInputSchema>;
@@ -31,7 +32,6 @@ const RecommendedJobSchemaRequired = z.object({
     glassdoor: z.string().optional().describe("A suggested search URL for finding similar jobs on Glassdoor. Example: 'https://www.glassdoor.co.in/Job/software-engineer-jobs-SRCH_KO0,17.htm'")
   }).describe("Suggested search URLs for popular job platforms. This object is mandatory.")
 });
-// Make all fields in RecommendedJobSchema optional for initial parsing from LLM, then enforce in post-processing
 const RecommendedJobSchemaLax = RecommendedJobSchemaRequired.partial();
 
 
@@ -46,28 +46,36 @@ export async function getJobRecommendations(input: JobRecommenderInput): Promise
   return jobRecommenderFlow(input);
 }
 
-// Define the prompt with a potentially laxer output schema for LLM response, then validate/clean in flow
 const jobRecommenderPrompt = ai.definePrompt({
   name: 'jobRecommenderPrompt',
   input: {schema: JobRecommenderInputSchema},
-  output: {schema: z.object({jobs: z.array(RecommendedJobSchemaLax)})}, // Use lax schema for LLM output
-  prompt: `You are an expert career advisor and job recommender. Based on the following resume details, suggest 3-5 job roles.
-For each and every job role, you MUST provide:
-1.  A plausible job title (the 'title' field). This is an absolutely critical and mandatory field. Without a title, the recommendation is useless. If you cannot confidently generate a valid, non-empty title, you should omit that entire job entry from your response.
-2.  A plausible company name (the 'company' field). This is mandatory.
-3.  A brief description (1-2 sentences) explaining why this job is a good fit for the candidate, referencing their skills and experience (the 'description' field). This is mandatory.
-4.  A relevance score (a number between 0.0 and 1.0) indicating how relevant this job is to the provided resume details (the 'relevanceScore' field). This is mandatory.
-5.  Suggested search URLs for finding similar jobs on LinkedIn, Naukri, Indeed, and Glassdoor (the 'suggestedSearchLinks' object with its respective string fields). These URLs should be functional search queries. For example, for LinkedIn: 'https://www.linkedin.com/jobs/search/?keywords=TITLE%20COMPANY&location=REGION' or similar constructive search links. This 'suggestedSearchLinks' object is mandatory. Even if specific links are hard to generate, provide valid default search query URLs for each platform based on the job title.
+  output: {schema: z.object({jobs: z.array(RecommendedJobSchemaLax)})}, 
+  prompt: `You are an expert career advisor and job recommender. Your primary goal is to provide highly relevant job suggestions based *directly* on the candidate's resume details.
+
+First, carefully analyze the provided Resume Details (Skills, Experience Summary, and Projects Summary). Identify the 2-3 most prominent skills, technologies, or experience areas mentioned.
+
+Then, based on these *identified prominent areas*, suggest 3-5 job roles. For each and every job role, you MUST provide:
+1.  A plausible job title (the 'title' field). This title *must directly reflect* the candidate's primary skills and experience. For example, if the resume highlights "Python, Django, and API development," a relevant title would be "Python Django Developer" or "Backend API Engineer," not a generic "Software Engineer" unless that's the best fit given extensive experience. This is an absolutely critical and mandatory field. Without a title clearly aligned with the resume's core strengths, the recommendation is useless. If you cannot confidently generate a valid, non-empty, and *relevant* title, omit that entire job entry.
+2.  A plausible company name (the 'company' field). This is mandatory. You can suggest well-known companies or generic but realistic company names (e.g., "Innovatech Solutions", "DataDriven Corp").
+3.  A brief description (1-2 sentences) explaining *specifically* why this job is a good fit for the candidate. This description MUST explicitly reference the candidate's skills and experience from their resume and connect them to the job's requirements. For example: "This Backend Developer role at Innovatech Solutions is a strong match due to your listed proficiency in Python, Django, and experience in building RESTful APIs, as detailed in your project work." This field is mandatory.
+4.  A relevance score (a number between 0.0 and 1.0) indicating how relevant *this specific job title and description* are to the *provided resume details*. A score of 1.0 means a perfect match for the resume's core strengths. This field is mandatory.
+5.  Suggested search URLs for finding similar jobs on LinkedIn, Naukri, Indeed, and Glassdoor (the 'suggestedSearchLinks' object with its respective string fields). These URLs should be functional search queries based on the *specific job title and potentially key skills*. For example, for LinkedIn: 'https://www.linkedin.com/jobs/search/?keywords=Python%20Django%20Developer&location=REMOTE' or similar constructive search links. This 'suggestedSearchLinks' object is mandatory. Even if specific links are hard to generate, provide valid default search query URLs for each platform based on the job title.
 
 Resume Details:
-Skills: {{#each skills}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}
+Skills: {{#if skills}}{{#each skills}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}No specific skills listed.{{/if}}
 Experience Summary: {{{experienceSummary}}}
-{{#if targetRole}}Target Role Preference: {{{targetRole}}}{{/if}}
+{{#if projectsSummary}}
+Projects Summary:
+{{#each projectsSummary}}
+- {{{this}}}
+{{/each}}
+{{/if}}
+{{#if targetRole}}Target Role Preference (consider this, but prioritize direct resume alignment): {{{targetRole}}}{{/if}}
 
-Generate recommendations that are diverse and cover different potential career paths if applicable.
+Generate recommendations that are diverse if the resume supports multiple paths, but always prioritize direct relevance to the resume's content.
 Ensure ALL required fields, especially 'title', 'company', 'description', 'relevanceScore', and 'suggestedSearchLinks', are present for *every* job object in the 'jobs' array.
-The output must strictly adhere to the JSON schema, paying close attention to required fields for each job object. The 'title' field is paramount.
-Do not include job entries if they lack a valid 'title'.
+The output must strictly adhere to the JSON schema, paying close attention to required fields for each job object. The 'title' and 'description' relevance is paramount.
+Do not include job entries if they lack a valid 'title' or a description that clearly links to the resume content.
 `,
 });
 
@@ -75,40 +83,34 @@ const jobRecommenderFlow = ai.defineFlow(
   {
     name: 'jobRecommenderFlow',
     inputSchema: JobRecommenderInputSchema,
-    outputSchema: JobRecommenderOutputSchema, // Flow's final output must adhere to the strict schema
+    outputSchema: JobRecommenderOutputSchema, 
   },
   async (input): Promise<JobRecommenderOutput> => {
-    // Use a more descriptive variable name for the raw response from the prompt
     const llmResponse = await jobRecommenderPrompt(input);
-    // Access the output property from the response
     const rawOutput = llmResponse.output;
 
 
     if (!rawOutput || !rawOutput.jobs) {
-      // Log more detailed error information if available from the LLM response
-      // This helps in debugging if the LLM fails to adhere to the schema
       const firstCandidateMessageContent = llmResponse.candidates?.[0]?.message?.content?.[0];
       const errorDetails = firstCandidateMessageContent?.data ?? firstCandidateMessageContent?.text ?? "No detailed error message available from LLM.";
       
       console.error(
         "JobRecommenderFlow: Schema validation failed or LLM returned no/invalid jobs array. LLM response content:",
-        JSON.stringify(errorDetails).substring(0, 1000) // Log more details if available
+        JSON.stringify(errorDetails).substring(0, 1000) 
       );
-      // Include original error if available in llmResponse, for more context
       if (llmResponse.error) {
         console.error("JobRecommenderFlow: Underlying Genkit error:", llmResponse.error);
       }
-      return { jobs: [] }; // Return a valid default structure
+      return { jobs: [] }; 
     }
     
     const processedJobs: RecommendedJob[] = [];
 
     for (const job of rawOutput.jobs) {
-      const currentJob = job || {}; // Handle case where a job object in the array might be null
+      const currentJob = job || {}; 
 
       const title = (currentJob.title && currentJob.title.trim() !== "") ? currentJob.title.trim() : null;
       
-      // If title is missing or empty, skip this job entry entirely.
       if (!title) {
         console.warn("JobRecommenderFlow: Skipping job due to missing or empty title.", currentJob);
         continue;
@@ -144,4 +146,3 @@ const jobRecommenderFlow = ai.defineFlow(
     return { jobs: processedJobs };
   }
 );
-

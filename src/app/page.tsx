@@ -108,6 +108,7 @@ export default function HomePage() {
         const jobRecs = await getJobRecommendations({
           skills: analysis.skills || [],
           experienceSummary: analysis.experience || "",
+          projectsSummary: analysis.projects,
           targetRole: inferredTargetRole,
         });
         setJobRecommendations(jobRecs);
