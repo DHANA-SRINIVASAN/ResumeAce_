@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Briefcase, Home, UserCircle, LogIn, LogOut, UserPlus, Sparkles } from 'lucide-react'; 
+import { Home, LogIn, LogOut, UserPlus, Sparkles } from 'lucide-react'; 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarHeader, SidebarFooter, SidebarContent } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from './ui/skeleton'; 
@@ -64,20 +64,7 @@ export function AppSidebarNavigation() {
 
             {isLoggedIn ? (
                 <>
-                    <SidebarMenuItem>
-                        <Link href="/candidate-portal" legacyBehavior passHref>
-                        <SidebarMenuButton asChild variant="default" size="default" tooltip="Access Candidate Tools">
-                            <a><UserCircle /> Candidate Portal</a>
-                        </SidebarMenuButton>
-                        </Link>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                        <Link href="/recruiter-portal" legacyBehavior passHref>
-                        <SidebarMenuButton asChild variant="default" size="default" tooltip="Access Recruiter Portal">
-                            <a><Briefcase /> Recruiter Portal</a>
-                        </SidebarMenuButton>
-                        </Link>
-                    </SidebarMenuItem>
+                    {/* Candidate Portal and Recruiter Portal links removed as per request */}
                     <SidebarMenuItem>
                         <SidebarMenuButton variant="ghost" size="default" onClick={logout} tooltip="Log out">
                             <LogOut /> Logout
@@ -117,4 +104,3 @@ export function AppSidebarNavigation() {
     </>
   );
 }
-
