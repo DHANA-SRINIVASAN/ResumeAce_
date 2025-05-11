@@ -2,6 +2,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation'; // Import usePathname
 import { Briefcase, Home, UserCircle, LogIn, LogOut, UserPlus, Sparkles } from 'lucide-react'; 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarHeader, SidebarFooter, SidebarContent } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
@@ -9,6 +10,7 @@ import { Skeleton } from './ui/skeleton';
 
 export function AppSidebarNavigation() {
   const { isLoggedIn, logout, isLoading } = useAuth();
+  const pathname = usePathname(); // Get current pathname
 
   if (isLoading) {
     return (
@@ -42,6 +44,9 @@ export function AppSidebarNavigation() {
     );
   }
 
+  // Condition for showing Candidate and Recruiter portal links
+  const showPortalLinks = isLoggedIn && pathname !== '/';
+
   return (
     <>
         <SidebarHeader className="p-4 flex items-center gap-2">
@@ -62,20 +67,24 @@ export function AppSidebarNavigation() {
 
             {isLoggedIn ? (
                 <>
-                <SidebarMenuItem>
-                    <Link href="/candidate-portal" legacyBehavior passHref>
-                    <SidebarMenuButton asChild variant="default" size="default" tooltip="Access Candidate Tools">
-                        <a><UserCircle /> Candidate Portal</a>
-                    </SidebarMenuButton>
-                    </Link>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                    <Link href="/recruiter-portal" legacyBehavior passHref>
-                    <SidebarMenuButton asChild variant="default" size="default" tooltip="Access Recruiter Portal">
-                        <a><Briefcase /> Recruiter Portal</a>
-                    </SidebarMenuButton>
-                    </Link>
-                </SidebarMenuItem>
+                {showPortalLinks && ( 
+                    <>
+                        <SidebarMenuItem>
+                            <Link href="/candidate-portal" legacyBehavior passHref>
+                            <SidebarMenuButton asChild variant="default" size="default" tooltip="Access Candidate Tools">
+                                <a><UserCircle /> Candidate Portal</a>
+                            </SidebarMenuButton>
+                            </Link>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <Link href="/recruiter-portal" legacyBehavior passHref>
+                            <SidebarMenuButton asChild variant="default" size="default" tooltip="Access Recruiter Portal">
+                                <a><Briefcase /> Recruiter Portal</a>
+                            </SidebarMenuButton>
+                            </Link>
+                        </SidebarMenuItem>
+                    </>
+                )}
                 <SidebarMenuItem>
                     <SidebarMenuButton variant="ghost" size="default" onClick={logout} tooltip="Log out">
                         <LogOut /> Logout
