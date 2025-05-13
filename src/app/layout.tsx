@@ -36,7 +36,6 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    // The comment "suppressHydrationWarning for theme toggle" was removed from here
     <html lang="en" suppressHydrationWarning> 
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <SidebarProvider defaultOpen={false}>
@@ -71,3 +70,4 @@ export default function RootLayout({
     </html>
   );
 }
+
