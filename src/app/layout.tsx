@@ -36,8 +36,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning> 
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+    <html lang="en" suppressHydrationWarning><body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <SidebarProvider defaultOpen={false}>
           <Sidebar>
             <AppSidebarNavigation />
@@ -66,8 +65,7 @@ export default function RootLayout({
             <Toaster />
           </SidebarInset>
         </SidebarProvider>
-      </body>
-    </html>
+      </body></html>
   );
 }
 
