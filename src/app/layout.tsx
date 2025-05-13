@@ -1,7 +1,8 @@
+
 import type {Metadata} from 'next';
 import {Geist, Geist_Mono} from 'next/font/google';
 import Link from 'next/link';
-import { Sparkles, PanelLeft, Briefcase, UserCircle } from 'lucide-react'; // Added Briefcase, UserCircle
+import { Sparkles, PanelLeft, Briefcase, UserCircle } from 'lucide-react';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import {
@@ -12,7 +13,7 @@ import {
 } from '@/components/ui/sidebar';
 import { AppSidebarNavigation } from '@/components/app-sidebar-navigation';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { useAuth } from '@/hooks/useAuth'; // Import useAuth
+import { useAuth } from '@/hooks/useAuth'; 
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -35,7 +36,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning> {/* suppressHydrationWarning for theme toggle */}
+    // The comment "suppressHydrationWarning for theme toggle" was removed from here
+    <html lang="en" suppressHydrationWarning> 
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <SidebarProvider defaultOpen={false}>
           <Sidebar>
