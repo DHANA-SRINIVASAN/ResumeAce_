@@ -3,7 +3,7 @@
 
 import React, { useState, useCallback, useRef } from 'react';
 import { AuthGuard } from '@/components/auth-guard'; 
-import { UploadCloud, FileText as FileTextIcon, Edit3, CheckCircle, XCircle, BookOpen, Target, Sparkles, ShieldAlert, Info } from 'lucide-react';
+import { UploadCloud, FileText as FileTextIcon, Edit3, CheckCircle, XCircle, BookOpen, Target, Sparkles, ShieldAlert, Info, Download, Brain, MessageSquareMore, FileSignature } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,8 +13,12 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { fileToDataUri } from '@/lib/file-utils';
 import { matchResumeToJd, type RecruiterMatchInput, type RecruiterMatchOutput } from '@/ai/flows/recruiter-matcher-flow';
+import { generateFeedbackHtml, type FeedbackHtmlOutput } from '@/ai/flows/feedback-pdf-generator-flow'; // New import
+import { analyzeResume, type AnalyzeResumeOutput } from '@/ai/flows/resume-analyzer'; // For feedback PDF
+import { downloadHtml } from '@/lib/download-utils'; // For HTML download
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const acceptedFileTypes: Record<string, string[]> = {
   'application/pdf': ['.pdf'],
@@ -24,11 +28,22 @@ const acceptedFileTypes: Record<string, string[]> = {
 };
 const acceptedFileExtensions = Object.values(acceptedFileTypes).flat().join(',');
 
+const jdTemplates = [
+  { label: "Select a template...", value: "" },
+  { label: "Software Engineer (General)", value: "We are seeking a motivated Software Engineer to design, develop, and maintain high-quality software solutions. Responsibilities include coding, testing, debugging, and collaborating with cross-functional teams. Proficiency in one or more programming languages (e.g., Java, Python, C++), understanding of data structures and algorithms, and experience with version control systems (e.g., Git) are required. Strong problem-solving skills and a bachelor's degree in Computer Science or a related field are essential. Experience with cloud platforms (AWS, Azure, GCP) and agile methodologies is a plus." },
+  { label: "Data Analyst", value: "We are looking for a Data Analyst to interpret data, analyze results using statistical techniques, and provide ongoing reports. You will develop and implement databases, data collection systems, data analytics, and other strategies that optimize statistical efficiency and quality. Strong analytical skills with the ability to collect, organize, analyze, and disseminate significant amounts of information with attention to detail and accuracy are crucial. Proficiency in SQL, Excel, and data visualization tools (e.g., Tableau, Power BI) is required. Experience with Python or R for data analysis is highly desirable." },
+  { label: "Frontend Developer", value: "Seeking a Frontend Developer to create user-friendly web pages and interfaces. You will be responsible for translating UI/UX design wireframes into actual code that will produce visual elements of the application. Proficiency in HTML, CSS, JavaScript, and modern frontend frameworks (e.g., React, Angular, Vue.js) is essential. Experience with responsive design, cross-browser compatibility, and version control (Git) is required. Familiarity with RESTful APIs and build tools like Webpack or Parcel is a plus." },
+  { label: "Marketing Specialist", value: "Join our team as a Marketing Specialist to develop and implement marketing strategies that strengthen our company’s market presence and help it find a 'voice' that will make a difference. You will conduct market research, manage digital campaigns (SEO/SEM, email, social media), create compelling content, and analyze campaign performance. Strong communication, creativity, and analytical skills are essential. Experience with marketing automation tools, CRM software, and Google Analytics is preferred." },
+];
+
+
 function RecruiterPortalContent() {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [jobDescription, setJobDescription] = useState<string>('');
   const [matchResult, setMatchResult] = useState<RecruiterMatchOutput | null>(null);
+  const [resumeAnalysisForPdf, setResumeAnalysisForPdf] = useState<AnalyzeResumeOutput | null>(null); // For feedback PDF
   const [isLoading, setIsLoading] = useState(false);
+  const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const resumeInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -98,9 +113,15 @@ function RecruiterPortalContent() {
     setIsLoading(true);
     setError(null);
     setMatchResult(null);
+    setResumeAnalysisForPdf(null);
 
     try {
       const resumeDataUri = await fileToDataUri(resumeFile);
+      
+      // Run resume analysis for feedback PDF context
+      const analysis = await analyzeResume({ resumeDataUri });
+      setResumeAnalysisForPdf(analysis);
+
       const input: RecruiterMatchInput = {
         resumeDataUri,
         jobDescriptionText: jobDescription,
@@ -125,6 +146,32 @@ function RecruiterPortalContent() {
     }
   };
 
+  const handleDownloadFeedback = async () => {
+    if (!matchResult || !resumeAnalysisForPdf) {
+      toast({ title: "Error", description: "Match result or resume analysis not available for feedback generation.", variant: "destructive"});
+      return;
+    }
+    setIsGeneratingFeedback(true);
+    try {
+      const feedbackInput = {
+        matchData: matchResult,
+        resumeAnalysis: resumeAnalysisForPdf,
+        jobDescriptionTitle: "Position being evaluated" // Placeholder, ideally extract from JD or input
+      };
+      const feedbackOutput: FeedbackHtmlOutput = await generateFeedbackHtml(feedbackInput);
+      downloadHtml(feedbackOutput.htmlContent, feedbackOutput.suggestedFilename);
+      toast({
+        title: "Feedback Report Generated",
+        description: `${feedbackOutput.suggestedFilename} has been downloaded.`,
+      });
+    } catch (err) {
+      console.error("Error generating feedback HTML:", err);
+      toast({ title: "Feedback Generation Failed", description: err instanceof Error ? err.message : "Could not generate feedback.", variant: "destructive" });
+    } finally {
+      setIsGeneratingFeedback(false);
+    }
+  };
+
   const getScoreColorClass = (score: number): string => {
     if (score >= 70) return 'text-green-500 dark:text-green-400';
     if (score >= 50) return 'text-yellow-500 dark:text-yellow-400';
@@ -133,7 +180,7 @@ function RecruiterPortalContent() {
   
   const getAssessmentBadgeVariant = (assessment: string): "default" | "secondary" | "destructive" | "outline" => {
     const lowerAssessment = assessment.toLowerCase();
-    if (lowerAssessment.includes("excellent") || lowerAssessment.includes("strong")) return "default"; // default is primary
+    if (lowerAssessment.includes("excellent") || lowerAssessment.includes("strong")) return "default"; 
     if (lowerAssessment.includes("good") || lowerAssessment.includes("fair")) return "secondary";
     return "destructive";
   };
@@ -203,15 +250,29 @@ function RecruiterPortalContent() {
 
           <Card className="shadow-xl bg-card/80 backdrop-blur-sm border border-primary/10 hover:border-primary/30 transition-all">
             <CardHeader>
-              <CardTitle className="flex items-center text-2xl text-primary"><Edit3 className="mr-3 h-7 w-7"/> Paste Job Description</CardTitle>
-              <CardDescription className="text-md">Enter the full job description text for analysis.</CardDescription>
+              <div className="flex justify-between items-center">
+                <CardTitle className="flex items-center text-2xl text-primary"><Edit3 className="mr-3 h-7 w-7"/> Job Description</CardTitle>
+                <Select onValueChange={(value) => {if(value) setJobDescription(value);}} disabled={isLoading}>
+                  <SelectTrigger className="w-[200px] text-xs">
+                    <SelectValue placeholder="Use Template..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {jdTemplates.map(template => (
+                      <SelectItem key={template.label} value={template.value} className="text-xs">
+                        {template.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <CardDescription className="text-md">Paste the full job description or use a template.</CardDescription>
             </CardHeader>
             <CardContent>
               <Textarea
                 placeholder="Paste the complete job description here..."
                 value={jobDescription}
                 onChange={(e) => setJobDescription(e.target.value)}
-                rows={10}
+                rows={8} // Reduced rows slightly to accommodate select
                 className="resize-none text-sm bg-background/70 border-border focus:border-primary focus:ring-primary rounded-xl p-4"
                 disabled={isLoading}
               />
@@ -240,6 +301,11 @@ function RecruiterPortalContent() {
                     <Sparkles className={cn("w-12 h-12", getScoreColorClass(matchResult.fitmentScore))} />
                 </div>
               <CardTitle className="text-4xl font-bold">Candidate Fitment Report</CardTitle>
+              <div className="flex justify-center mt-4">
+                <Button onClick={handleDownloadFeedback} variant="outline" size="sm" disabled={isGeneratingFeedback}>
+                  {isGeneratingFeedback ? <LoadingIndicator size="xs" text="Generating..." /> : <><Download className="mr-2 h-4 w-4" />Download Feedback Report</>}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-8 px-4 md:px-8 pb-8">
               <div className="text-center">
@@ -254,10 +320,30 @@ function RecruiterPortalContent() {
               </div>
 
               <Card className="bg-secondary/20 border-border/50 shadow-inner">
-                <CardHeader><CardTitle className="text-xl text-primary">AI Reasoning</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-xl text-primary flex items-center"><MessageSquareMore className="mr-2 h-5 w-5"/>AI Reasoning</CardTitle></CardHeader>
                 <CardContent><p className="text-md text-foreground/90 leading-relaxed">{matchResult.reasoning}</p></CardContent>
               </Card>
               
+              {matchResult.jdSkillsAnalysis && (
+                <Card className="bg-blue-500/5 border-blue-500/30 shadow-md">
+                    <CardHeader><CardTitle className="text-lg flex items-center text-blue-700 dark:text-blue-300"><Brain className="mr-2.5 h-6 w-6"/>Detailed Skills Breakdown</CardTitle></CardHeader>
+                    <CardContent className="text-sm space-y-2">
+                        <p><strong>Identified Skills in JD:</strong> {matchResult.jdSkillsAnalysis.identifiedSkillsInJd.join(', ') || 'N/A'}</p>
+                        <p className="text-green-600"><strong>Mandatory Skills Met:</strong> {matchResult.jdSkillsAnalysis.mandatorySkillsMet.join(', ') || 'None'}</p>
+                        <p className="text-green-500"><strong>Optional Skills Met:</strong> {matchResult.jdSkillsAnalysis.optionalSkillsMet.join(', ') || 'None'}</p>
+                        <p className="text-red-600"><strong>Missing Mandatory Skills:</strong> {matchResult.jdSkillsAnalysis.missingMandatorySkills.join(', ') || 'None'}</p>
+                        {matchResult.jdSkillsAnalysis.missingOptionalSkills && matchResult.jdSkillsAnalysis.missingOptionalSkills.length > 0 &&
+                            <p className="text-amber-600"><strong>Missing Optional Skills:</strong> {matchResult.jdSkillsAnalysis.missingOptionalSkills.join(', ') || 'None'}</p>
+                        }
+                        <p><strong>Additional Skills in Resume (Not in JD):</strong> {matchResult.jdSkillsAnalysis.additionalSkillsInResume.join(', ') || 'None'}</p>
+                        <AlertDescription className="text-xs mt-2">
+                            Counts: {matchResult.jdSkillsAnalysis.mandatorySkillsMet.length + matchResult.jdSkillsAnalysis.optionalSkillsMet.length} / {matchResult.jdSkillsAnalysis.identifiedSkillsInJd.length} JD skills matched.
+                        </AlertDescription>
+                    </CardContent>
+                </Card>
+              )}
+
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card className="bg-green-500/5 border-green-500/30 shadow-md">
                   <CardHeader><CardTitle className="text-lg flex items-center text-green-600 dark:text-green-400"><CheckCircle className="mr-2.5 h-6 w-6"/>Key Strengths & Matches</CardTitle></CardHeader>

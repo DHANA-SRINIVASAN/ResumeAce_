@@ -12,6 +12,7 @@ import { InteractiveFeedback } from '@/components/interactive-feedback';
 import { CareerRoadmapDisplay } from '@/components/career-roadmap-display';
 import { BiasDetectionDisplay } from '@/components/bias-detection-display';
 import { CourseRecommendationsDisplay } from '@/components/course-recommendations-display';
+import { ResumeSummaryDisplay } from '@/components/resume-summary-display'; // New import
 import { LoadingIndicator } from '@/components/loading-indicator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { analyzeResume, type AnalyzeResumeOutput } from '@/ai/flows/resume-analyzer';
@@ -19,7 +20,7 @@ import { analyzeResumeAndScore, type AnalyzeResumeAndScoreOutput } from '@/ai/fl
 import { getJobRecommendations, type JobRecommenderOutput } from '@/ai/flows/job-recommender';
 import { fileToDataUri } from '@/lib/file-utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, FileText, Sparkles, Target, Bot, MapPinned, Filter, BookOpen, Lightbulb, ShieldAlert, Info } from 'lucide-react';
+import { BarChart, FileText, Sparkles, Target, Bot, MapPinned, Filter, BookOpen, Lightbulb, ShieldAlert, Info, BookText as BookTextIcon } from 'lucide-react'; // Added BookTextIcon
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 function CandidatePortalContent() {
@@ -164,6 +165,7 @@ function CandidatePortalContent() {
 
     const TABS_CONFIG = [
         { value: "analysis", icon: FileText, label: "Analysis", disabled: false },
+        { value: "summary", icon: BookTextIcon, label: "Summary", disabled: false }, // New Tab
         { value: "feedback", icon: Bot, label: "AI Chat", disabled: false },
         { value: "jobs", icon: Target, label: "Jobs", disabled: !scoreResult || scoreResult.score < 30 },
         { value: "roadmap", icon: MapPinned, label: "Roadmap", disabled: false },
@@ -173,7 +175,7 @@ function CandidatePortalContent() {
 
     return (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 mb-8 p-2 bg-muted rounded-xl shadow-inner">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2 mb-8 p-2 bg-muted rounded-xl shadow-inner"> {/* Adjusted grid-cols */}
                 {TABS_CONFIG.map(tab => (
                     <TabsTrigger 
                         key={tab.value} 
@@ -191,6 +193,9 @@ function CandidatePortalContent() {
                     {scoreResult && <ScoreFeedbackDisplay scoreData={scoreResult} />}
                     {analysisResult && <AnalysisResultsDisplay analysis={analysisResult} />}
                 </div>
+            </TabsContent>
+            <TabsContent value="summary">
+                 <ResumeSummaryDisplay analysisResult={analysisResult} triggerAnalysis={activeTab === "summary"} />
             </TabsContent>
             <TabsContent value="feedback">
                 <InteractiveFeedback analysisResult={analysisResult} scoreResult={scoreResult} />
@@ -261,6 +266,7 @@ function CandidatePortalContent() {
                     <p><span className="font-semibold text-foreground">3. Explore Insights:</span> Use the tabs above to dive deeper:</p>
                     <ul className="list-none pl-4 space-y-1.5">
                         <li className="flex items-start"><FileText className="mr-2 mt-0.5 h-4 w-4 text-primary shrink-0"/><div><span className="font-medium">Analysis:</span> View parsed data & overall score.</div></li>
+                        <li className="flex items-start"><BookTextIcon className="mr-2 mt-0.5 h-4 w-4 text-primary shrink-0"/><div><span className="font-medium">Summary:</span> Get an AI-generated professional summary.</div></li>
                         <li className="flex items-start"><Bot className="mr-2 mt-0.5 h-4 w-4 text-primary shrink-0"/><div><span className="font-medium">AI Chat:</span> Ask specific questions about your resume.</div></li>
                         <li className="flex items-start"><Target className="mr-2 mt-0.5 h-4 w-4 text-primary shrink-0"/><div><span className="font-medium">Jobs:</span> Get job recommendations (if score ≥ 30).</div></li> 
                         <li className="flex items-start"><MapPinned className="mr-2 mt-0.5 h-4 w-4 text-primary shrink-0"/><div><span className="font-medium">Roadmap:</span> Generate a career plan to your target role.</div></li>

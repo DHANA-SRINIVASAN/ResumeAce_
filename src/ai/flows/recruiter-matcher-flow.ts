@@ -32,12 +32,22 @@ const RecruiterMatchInputSchema = z.object({
 });
 export type RecruiterMatchInput = z.infer<typeof RecruiterMatchInputSchema>;
 
+const JdSkillsAnalysisSchema = z.object({
+    identifiedSkillsInJd: z.array(z.string()).describe("All skills identified within the job description text."),
+    mandatorySkillsMet: z.array(z.string()).describe("Mandatory skills from the JD that are present in the resume."),
+    optionalSkillsMet: z.array(z.string()).describe("Optional or 'nice-to-have' skills from the JD that are present in the resume."),
+    missingMandatorySkills: z.array(z.string()).describe("Mandatory skills from the JD that are NOT found in the resume."),
+    missingOptionalSkills: z.array(z.string()).optional().describe("Optional skills from the JD that are NOT found in the resume."),
+    additionalSkillsInResume: z.array(z.string()).describe("Skills present in the resume that were not explicitly mentioned in the JD but might be relevant."),
+});
+
 const RecruiterMatchOutputSchema = z.object({
   fitmentScore: z.number().min(0).max(100).describe("A numerical score from 0 to 100 indicating how well the resume matches the job description."),
   assessment: z.string().describe("A concise qualitative assessment of the fit (e.g., 'Excellent Fit', 'Good Fit', 'Fair Match', 'Needs Significant Improvement')."),
   reasoning: z.string().describe("A brief explanation for the score, highlighting key alignments and discrepancies between the resume and JD."),
   keyMatches: z.array(z.string()).describe("An array of strings listing specific skills, experiences, or qualifications from the resume that align well with the job description."),
   keyMismatches: z.array(z.string()).describe("An array of strings listing critical skills or qualifications required by the job description that are missing or not evident in the resume (skill gaps)."),
+  jdSkillsAnalysis: JdSkillsAnalysisSchema.optional().describe("Detailed analysis of skills match between JD and resume. LLM should attempt to differentiate mandatory vs. optional skills if JD implies it."),
   courseRecommendations: z.array(RecommendedCourseSchema).optional().describe("If the fitmentScore is below 70, an optional list of up to 3 course recommendations to address skill gaps. Each recommendation must include 'title', 'platform', and 'description'.")
 });
 export type RecruiterMatchOutput = z.infer<typeof RecruiterMatchOutputSchema>;
@@ -61,7 +71,15 @@ Your evaluation must include the following, adhering strictly to the JSON output
 3.  **reasoning**: A brief (2-3 sentences) explanation for the score. Highlight major strengths and weaknesses of the resume concerning the JD.
 4.  **keyMatches**: A list (array of strings) of 3-5 specific skills, experiences, or qualifications from the resume that strongly align with the job description's requirements.
 5.  **keyMismatches**: A list (array of strings) of 3-5 critical skills or qualifications explicitly required by the job description that are missing, not clearly stated, or underdeveloped in the resume. These are skill gaps.
-6.  **courseRecommendations**: (Only if fitmentScore is below 70)
+6.  **jdSkillsAnalysis**: A detailed breakdown of skills:
+    *   'identifiedSkillsInJd': List all distinct skills mentioned in the job description.
+    *   'mandatorySkillsMet': Skills from the JD deemed mandatory that the resume possesses.
+    *   'optionalSkillsMet': Skills from the JD deemed optional/nice-to-have that the resume possesses.
+    *   'missingMandatorySkills': Mandatory skills from the JD NOT in the resume.
+    *   'missingOptionalSkills': Optional skills from the JD NOT in the resume.
+    *   'additionalSkillsInResume': Skills in the resume not listed in the JD but potentially relevant.
+    (Attempt to infer mandatory vs. optional based on JD phrasing like "must have," "required," vs. "preferred," "plus").
+7.  **courseRecommendations**: (Only if fitmentScore is below 70)
     *   Provide 1-3 course recommendations to help bridge the identified 'keyMismatches' (skill gaps).
     *   Each course recommendation MUST include:
         *   'title': A plausible course title.
@@ -91,19 +109,37 @@ const recruiterMatchFlow = ai.defineFlow(
   async (input) => {
     const { output } = await recruiterMatcherPrompt(input);
 
-    // Ensure courseRecommendations is an empty array if score is >= 70 and it was provided
-    if (output && output.fitmentScore >= 70 && output.courseRecommendations && output.courseRecommendations.length > 0) {
-      output.courseRecommendations = [];
-    }
-    // Ensure courseRecommendations array exists if undefined and score is < 70 (though schema should handle this if prompt fails)
-    if (output && output.fitmentScore < 70 && output.courseRecommendations === undefined) {
-        output.courseRecommendations = [];
-    }
-    
-    // Ensure keyMatches and keyMismatches are arrays
     if (output) {
+        // Ensure courseRecommendations logic
+        if (output.fitmentScore >= 70 && output.courseRecommendations && output.courseRecommendations.length > 0) {
+            output.courseRecommendations = [];
+        } else if (output.fitmentScore < 70 && !output.courseRecommendations) {
+            output.courseRecommendations = [];
+        }
+        
+        // Default/ensure arrays for skills analysis if jdSkillsAnalysis is present but some sub-arrays are missing
+        if (output.jdSkillsAnalysis) {
+            output.jdSkillsAnalysis.identifiedSkillsInJd = output.jdSkillsAnalysis.identifiedSkillsInJd || [];
+            output.jdSkillsAnalysis.mandatorySkillsMet = output.jdSkillsAnalysis.mandatorySkillsMet || [];
+            output.jdSkillsAnalysis.optionalSkillsMet = output.jdSkillsAnalysis.optionalSkillsMet || [];
+            output.jdSkillsAnalysis.missingMandatorySkills = output.jdSkillsAnalysis.missingMandatorySkills || [];
+            output.jdSkillsAnalysis.missingOptionalSkills = output.jdSkillsAnalysis.missingOptionalSkills || [];
+            output.jdSkillsAnalysis.additionalSkillsInResume = output.jdSkillsAnalysis.additionalSkillsInResume || [];
+        } else {
+            // If jdSkillsAnalysis itself is missing, initialize it with empty arrays
+             output.jdSkillsAnalysis = {
+                identifiedSkillsInJd: [],
+                mandatorySkillsMet: [],
+                optionalSkillsMet: [],
+                missingMandatorySkills: [],
+                missingOptionalSkills: [],
+                additionalSkillsInResume: [],
+            };
+        }
+
         output.keyMatches = output.keyMatches || [];
         output.keyMismatches = output.keyMismatches || [];
+
         if (output.courseRecommendations) {
              output.courseRecommendations = output.courseRecommendations.map(rec => ({
                 title: rec.title || "Untitled Course Recommendation",
@@ -111,12 +147,10 @@ const recruiterMatchFlow = ai.defineFlow(
                 description: rec.description || "No description provided.",
                 ...rec
             }));
-        } else {
-            output.courseRecommendations = [];
         }
     }
-
 
     return output!;
   }
 );
+
