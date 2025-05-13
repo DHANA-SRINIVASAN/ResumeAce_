@@ -1,7 +1,7 @@
 import type {Metadata} from 'next';
 import {Geist, Geist_Mono} from 'next/font/google';
 import Link from 'next/link';
-import { Sparkles, PanelLeft } from 'lucide-react';
+import { Sparkles, PanelLeft, Briefcase, UserCircle } from 'lucide-react'; // Added Briefcase, UserCircle
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import {
@@ -11,7 +11,8 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { AppSidebarNavigation } from '@/components/app-sidebar-navigation';
-import { ThemeToggle } from '@/components/theme-toggle'; // Import ThemeToggle
+import { ThemeToggle } from '@/components/theme-toggle';
+import { useAuth } from '@/hooks/useAuth'; // Import useAuth
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -57,7 +58,7 @@ export default function RootLayout({
                         <span className="text-xl font-semibold text-primary">Resume<span className="text-accent">Ace</span></span>
                     </Link>
                 </div>
-                <ThemeToggle /> {/* Add ThemeToggle here */}
+                <ThemeToggle />
             </header>
             
             <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
