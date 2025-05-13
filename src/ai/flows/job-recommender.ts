@@ -12,10 +12,10 @@ import {ai} from '@/ai/genkit';
 import {z}from 'genkit';
 
 const JobRecommenderInputSchema = z.object({
-  skills: z.array(z.string()).describe('A list of skills from the resume.'),
+  skills: z.array(z.string()).describe('A list of skills from the resume. This is the primary factor for matching.'),
   experienceSummary: z.string().describe('A summary of the work experience from the resume, especially the most recent experience.'),
   projectsSummary: z.array(z.string()).optional().describe('A list of project descriptions from the resume, which can highlight practical application of skills.'),
-  targetRole: z.string().optional().describe('A specific target role the user might be interested in.'),
+  targetRole: z.string().optional().describe('A specific target role the user might be interested in. This is a secondary factor after skills.'),
 });
 export type JobRecommenderInput = z.infer<typeof JobRecommenderInputSchema>;
 
@@ -49,26 +49,26 @@ const jobRecommenderPrompt = ai.definePrompt({
   // Output schema for the prompt allows for partial data, post-processing will enforce stricter rules.
   output: {schema: z.object({jobs: z.array(RecommendedJobSchemaLax).min(0)})}, 
   prompt: `You are an expert job recommendation assistant and an adept job sourcer.
-Your primary goal is to find relevant job openings based on the candidate's 'Top Skills'. This is the most important factor.
+Your primary goal is to find relevant job openings based on the candidate's 'Skills'. This is the most important factor.
 Also consider their recent experience and any target role mentioned.
 
 Your task is to generate job recommendations. Aim for 5 to 10 diverse recommendations, but **it is crucial to provide any suitable matches you find, even if fewer than 5.** Returning some valid job entries is highly preferred over returning an empty list.
 
-**For EVERY job recommendation you provide, you MUST include ALL of the following fields:**
+**For EVERY job recommendation you provide, you MUST attempt to include ALL of the following fields:**
 - Job Title (e.g., "Software Engineer")
 - Company Name (e.g., "Tech Solutions Inc.")
 - Location (e.g., "Chennai, India", "Remote"). This field is mandatory.
 - Key Required Skills (a list of 3-5 skills, e.g., ["Java", "Spring Boot", "SQL"])
 - Short Job Description (2-3 sentences summarizing the role)
-- Match Score (a percentage from 0 to 100, heavily reflecting skill alignment with the candidate's 'Top Skills')
+- Match Score (a percentage from 0 to 100, heavily reflecting skill alignment with the candidate's 'Skills')
 - Direct Job Link (a plausible URL, e.g., https://www.linkedin.com/jobs/view/12345)
 - Platform (The job portal name, e.g., "LinkedIn", "Naukri", "Indeed", "Glassdoor", "SimplyHired")
 
-Simulate sourcing these jobs from a variety of platforms. Aim for at least 3-4 distinct platform sources in your recommendations if suitable jobs are found.
+Simulate sourcing these jobs from a variety of platforms (LinkedIn, Naukri, Indeed, Glassdoor, SimplyHired). Aim for at least 3-4 distinct platform sources in your recommendations if suitable jobs are found.
 Prioritize jobs located in India, specifically in cities like Chennai, Bangalore, Hyderabad, Coimbatore, and Trichy, if these align with the profile or are generally suitable.
 
 Candidate's Resume Details:
-Top Skills: {{#if skills}}{{#each skills}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}No specific skills listed. Your ability to find jobs will be limited without skills.{{/if}}
+Skills: {{#if skills}}{{#each skills}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}No specific skills listed. Your ability to find jobs will be limited without skills.{{/if}}
 Most Recent Experience Summary: {{{experienceSummary}}}
 {{#if projectsSummary}}
 Projects Summary (if relevant):
@@ -81,9 +81,9 @@ User's Stated Target Role (consider this, but skill match is the primary driver)
 {{/if}}
 
 Output strictly in the defined JSON schema. 
-**Only include jobs in the output array if they have a matchScore of 30% or higher AND all mandatory fields listed above are present.**
-If no jobs meet these criteria even after a thorough search, you may return an empty 'jobs' array.
-Ensure the 'Platform' field is accurately populated for each job.
+Prioritize returning some job entries that are good skill matches, even if some details are harder to simulate (like a perfect application link). The system will attempt to clean up or default missing minor fields if necessary.
+Ensure the 'Platform' field is accurately populated for each job you can find.
+If you truly cannot find any relevant jobs based on the skills, you may return an empty 'jobs' array.
 `,
 });
 
@@ -183,5 +183,3 @@ const jobRecommenderFlow = ai.defineFlow(
     return { jobs: finalJobs };
   }
 );
-
-
