@@ -29,7 +29,7 @@ const acceptedFileTypes: Record<string, string[]> = {
 const acceptedFileExtensions = Object.values(acceptedFileTypes).flat().join(',');
 
 const jdTemplates = [
-  { label: "Select a template...", value: "" },
+  // Removed: { label: "Select a template...", value: "" },
   { label: "Software Engineer (General)", value: "We are seeking a motivated Software Engineer to design, develop, and maintain high-quality software solutions. Responsibilities include coding, testing, debugging, and collaborating with cross-functional teams. Proficiency in one or more programming languages (e.g., Java, Python, C++), understanding of data structures and algorithms, and experience with version control systems (e.g., Git) are required. Strong problem-solving skills and a bachelor's degree in Computer Science or a related field are essential. Experience with cloud platforms (AWS, Azure, GCP) and agile methodologies is a plus." },
   { label: "Data Analyst", value: "We are looking for a Data Analyst to interpret data, analyze results using statistical techniques, and provide ongoing reports. You will develop and implement databases, data collection systems, data analytics, and other strategies that optimize statistical efficiency and quality. Strong analytical skills with the ability to collect, organize, analyze, and disseminate significant amounts of information with attention to detail and accuracy are crucial. Proficiency in SQL, Excel, and data visualization tools (e.g., Tableau, Power BI) is required. Experience with Python or R for data analysis is highly desirable." },
   { label: "Frontend Developer", value: "Seeking a Frontend Developer to create user-friendly web pages and interfaces. You will be responsible for translating UI/UX design wireframes into actual code that will produce visual elements of the application. Proficiency in HTML, CSS, JavaScript, and modern frontend frameworks (e.g., React, Angular, Vue.js) is essential. Experience with responsive design, cross-browser compatibility, and version control (Git) is required. Familiarity with RESTful APIs and build tools like Webpack or Parcel is a plus." },
@@ -252,7 +252,7 @@ function RecruiterPortalContent() {
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle className="flex items-center text-2xl text-primary"><Edit3 className="mr-3 h-7 w-7"/> Job Description</CardTitle>
-                <Select onValueChange={(value) => {if(value) setJobDescription(value);}} disabled={isLoading}>
+                <Select onValueChange={(value) => setJobDescription(value)} disabled={isLoading}>
                   <SelectTrigger className="w-[200px] text-xs">
                     <SelectValue placeholder="Use Template..." />
                   </SelectTrigger>
@@ -416,3 +416,4 @@ export default function RecruiterPortalPage() {
     </AuthGuard>
   );
 }
+
