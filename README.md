@@ -560,10 +560,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Contact & Support
 
-- **Email**: your.email@example.com
-- **LinkedIn**: [Your LinkedIn Profile](https://linkedin.com/in/yourprofile)
-- **GitHub**: [Your GitHub Profile](https://github.com/yourusername)
-- **Project Issues**: [GitHub Issues](https://github.com/yourusername/resumeace/issues)
+- **Email**: dhanasrinivasan1921@gmail.com
+- **LinkedIn**: [Your LinkedIn Profile](https://www.linkedin.com/in/ds1921/)
+- **GitHub**: [Your GitHub Profile](https://github.com/DHANA-SRINIVASAN)
+- **Project Issues**: [GitHub Issues](https://github.com/DHANA-SRINIVASAN/ResumeAce_/issues)
 
 ---
 
