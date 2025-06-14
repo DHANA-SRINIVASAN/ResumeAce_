@@ -1,0 +1,457 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://postgres:Admin@localhost:5432/resumeace"
+}
+
+// User model
+model User {
+  id                String              @id @default(uuid())
+  email             String              @unique
+  name              String?
+  password          String?             // Hashed password
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  resumes           Resume[]
+  jobApplications   JobApplication[]
+  skillDevelopment  SkillDevelopment[]
+  preferences       UserPreferences?
+  linkedAccounts    LinkedAccount[]
+  passwordResets    PasswordReset[]
+  candidates        Candidate[]         // Added for candidate management
+  jobPostings       JobPosting[]        // Added for job posting management
+  usageStats        AppUsageStats[]     // Track user activity
+  feedback          Feedback[]          // User feedback
+  
+  // New relations for the three tables
+  signupData        UserSignupData?     // 1. User signup data
+  resumeAnalyses    ResumeAnalysis[]    // 2. Resume extraction and job recommendations
+  recruiterMatches  RecruiterMatch[]    // 3. Recruiter portal resume-job matching
+}
+
+// Resume model
+model Resume {
+  id                String              @id @default(uuid())
+  userId            String
+  title             String
+  content           Json                // Store the entire resume content as JSON
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobMatches        JobMatch[]
+  skillGapAnalyses  SkillGapAnalysis[]
+  jobApplications   JobApplication[]
+  anonymizedVersion String?             // Path to anonymized version
+  sentimentScore    Float?              // Resume language effectiveness score
+  analyses          ResumeAnalysis[]    // Relation to resume analysis
+  
+  @@index([userId])
+}
+
+// Job Match model
+model JobMatch {
+  id              String            @id @default(uuid())
+  resumeId        String
+  jobData         Json              // Store the entire job data as JSON
+  matchScore      Int?              // Match percentage
+  createdAt       DateTime          @default(now())
+  resume          Resume            @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  applications    JobApplication[]
+
+  @@index([resumeId])
+}
+
+// Skill Gap Analysis model
+model SkillGapAnalysis {
+  id              String            @id @default(uuid())
+  resumeId        String
+  jobDescription  String            @db.Text
+  requiredSkills  Json              // Array of required skills
+  missingSkills   Json              // Array of missing skills
+  recommendations Json              // Recommendations for skill development
+  matchPercentage Int
+  createdAt       DateTime          @default(now())
+  resume          Resume            @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@index([resumeId])
+}
+
+// Job Application model
+model JobApplication {
+  id              String            @id @default(uuid())
+  userId          String
+  resumeId        String
+  jobMatchId      String?
+  jobTitle        String
+  company         String
+  applicationDate DateTime          @default(now())
+  status          String            // Applied, Interviewing, Rejected, Offered, Accepted
+  notes           String?           @db.Text
+  nextSteps       String?
+  interviewDate   DateTime?
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resume          Resume            @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  jobMatch        JobMatch?         @relation(fields: [jobMatchId], references: [id])
+
+  @@index([userId])
+  @@index([resumeId])
+  @@index([jobMatchId])
+}
+
+// Skill Development model
+model SkillDevelopment {
+  id              String            @id @default(uuid())
+  userId          String
+  skill           String
+  courses         Json              // Array of courses being taken
+  progress        Int               // Percentage complete
+  startDate       DateTime          @default(now())
+  targetDate      DateTime?
+  completed       Boolean           @default(false)
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// User Preferences model
+model UserPreferences {
+  id                  String        @id @default(uuid())
+  userId              String        @unique
+  privacySettings     Json          // Privacy settings for resume sharing
+  jobAlertFrequency   String?       // Daily, Weekly, etc.
+  desiredLocations    Json?         // Array of preferred locations
+  remotePreference    String?       // Remote, Hybrid, On-site
+  salaryExpectations  Json?         // Min, max, currency
+  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// LinkedIn and other external account integrations
+model LinkedAccount {
+  id              String            @id @default(uuid())
+  userId          String
+  provider        String            // LinkedIn, Indeed, etc.
+  providerUserId  String
+  accessToken     String?
+  refreshToken    String?
+  expiresAt       DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+}
+
+// Password reset tokens
+model PasswordReset {
+  id              String            @id @default(uuid())
+  userId          String
+  token           String            @unique
+  expiresAt       DateTime
+  used            Boolean           @default(false)
+  createdAt       DateTime          @default(now())
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+// Candidate model for recruiter portal
+model Candidate {
+  id            String          @id @default(uuid())
+  name          String
+  email         String?
+  phone         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  userId        String
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resumes       CandidateResume[]
+  tags          CandidateTag[]
+  notes         CandidateNote[]
+  matches       CandidateJobMatch[]
+
+  @@index([userId])
+}
+
+// Candidate Resume model
+model CandidateResume {
+  id            String          @id @default(uuid())
+  title         String
+  fileName      String
+  fileType      String
+  fileSize      Int
+  fileUrl       String
+  content       String?         @db.Text
+  parsedData    Json?           // Structured data extracted from resume
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  candidateId   String
+  candidate     Candidate       @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  matches       CandidateJobMatch[]
+  analysis      CandidateResumeAnalysis?
+
+  @@index([candidateId])
+}
+
+// Candidate Resume Analysis
+model CandidateResumeAnalysis {
+  id            String          @id @default(uuid())
+  skills        Json?
+  experience    Json?
+  education     Json?
+  summary       String?         @db.Text
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  resumeId      String          @unique
+  resume        CandidateResume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+}
+
+// Job Posting for recruiter portal
+model JobPosting {
+  id            String          @id @default(uuid())
+  title         String
+  description   String          @db.Text
+  company       String?
+  location      String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  userId        String
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  matches       CandidateJobMatch[]
+
+  @@index([userId])
+}
+
+// Candidate Job Match
+model CandidateJobMatch {
+  id            String          @id @default(uuid())
+  score         Int
+  assessment    String?
+  keyMatches    Json?
+  keyMismatches Json?
+  feedback      String?         @db.Text
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  resumeId      String
+  resume        CandidateResume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  candidateId   String
+  candidate     Candidate       @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  jobPostingId  String
+  jobPosting    JobPosting      @relation(fields: [jobPostingId], references: [id], onDelete: Cascade)
+
+  @@index([resumeId])
+  @@index([candidateId])
+  @@index([jobPostingId])
+}
+
+// Candidate Tag
+model CandidateTag {
+  id            String          @id @default(uuid())
+  name          String
+  color         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  candidateId   String
+  candidate     Candidate       @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@unique([candidateId, name])
+  @@index([candidateId])
+}
+
+// Candidate Note
+model CandidateNote {
+  id            String          @id @default(uuid())
+  content       String          @db.Text
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  candidateId   String
+  candidate     Candidate       @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+}
+
+// Resume Template model
+model ResumeTemplate {
+  id              String        @id @default(uuid())
+  name            String        @unique
+  description     String
+  previewImageUrl String
+  isDefault       Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+// Application Usage Statistics model
+model AppUsageStats {
+  id                String        @id @default(uuid())
+  userId            String?
+  user              User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  eventType         String        // e.g., "page_view", "resume_created", "template_selected"
+  eventData         Json?         // Additional data about the event
+  userAgent         String?       // Browser/device info
+  ipAddress         String?       // IP address (store anonymized if needed for privacy)
+  referrer          String?       // Where the user came from
+  timestamp         DateTime      @default(now())
+  sessionId         String?       // To group events in a user session
+  
+  @@index([userId])
+  @@index([eventType])
+  @@index([timestamp])
+  @@index([sessionId])
+}
+
+// 1. User Signup Data
+model UserSignupData {
+  id                String        @id @default(uuid())
+  userId            String        @unique
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Signup information
+  signupDate        DateTime      @default(now())
+  referralSource    String?       // How the user found the site
+  initialPlan       String?       // Which plan they initially signed up for
+  
+  // User profile data
+  jobTitle          String?
+  industry          String?
+  yearsOfExperience Int?
+  educationLevel    String?
+  location          String?
+  skills            String[]
+  
+  // Preferences
+  jobSearchStatus   String?       // "actively_looking", "open_to_opportunities", "not_looking"
+  preferredJobTypes String[]      // "full_time", "part_time", "contract", etc.
+  preferredLocations String[]
+  remotePreference  String?       // "remote_only", "hybrid", "on_site", "flexible"
+  
+  // Additional metadata
+  deviceInfo        Json?         // Device used for signup
+  completedProfile  Boolean       @default(false)
+  
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  
+  @@index([jobTitle])
+  @@index([industry])
+  @@index([location])
+}
+
+// 2. Resume Extraction and Job Recommendations
+model ResumeAnalysis {
+  id                String        @id @default(uuid())
+  userId            String
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resumeId          String
+  resume            Resume        @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  
+  // Extracted resume data
+  extractedData     Json          // Structured data extracted from resume
+  
+  // Analysis results
+  skills            String[]
+  experience        Json[]        // Array of work experiences with details
+  education         Json[]        // Array of education entries
+  missingElements   String[]      // Elements missing from the resume
+  improvementSuggestions Json?    // Suggestions for improvement
+  
+  // ATS compatibility
+  atsScore          Int?          // Score out of 100
+  atsIssues         Json?         // Issues that might affect ATS parsing
+  
+  // Job recommendations
+  jobRecommendations Json?        // Recommended jobs based on resume
+  
+  // Career path analysis
+  careerPathOptions Json?         // Potential career paths
+  skillGaps         Json?         // Skills needed for career progression
+  
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  
+  @@unique([userId, resumeId])
+  @@index([userId])
+  @@index([resumeId])
+}
+
+// 3. Recruiter Portal Resume-Job Matching
+model RecruiterMatch {
+  id                String        @id @default(uuid())
+  recruiterId       String        // ID of the recruiter
+  recruiter         User          @relation(fields: [recruiterId], references: [id], onDelete: Cascade)
+  
+  // Job details
+  jobTitle          String
+  jobDescription    String        @db.Text
+  jobRequirements   Json          // Required skills, experience, etc.
+  jobLocation       String?
+  
+  // Candidate details
+  candidateName     String
+  candidateEmail    String?
+  resumeText        String        @db.Text
+  resumeFile        String?       // Path or URL to the resume file
+  
+  // Match analysis
+  matchScore        Int           // Overall match score (0-100)
+  skillMatch        Json          // Detailed skill matching
+  experienceMatch   Json          // Experience matching analysis
+  educationMatch    Json          // Education matching analysis
+  
+  // Detailed analysis
+  strengths         String[]      // Candidate strengths for this job
+  weaknesses        String[]      // Areas where candidate doesn't match
+  recommendations   String?       @db.Text // Recommendations for the recruiter
+  
+  // Status
+  status            String        @default("new") // "new", "reviewed", "contacted", "rejected", "hired"
+  notes             String?       @db.Text // Recruiter notes
+  
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  
+  @@index([recruiterId])
+  @@index([jobTitle])
+  @@index([candidateName])
+  @@index([matchScore])
+  @@index([status])
+}
+
+// Application Settings model
+model AppSettings {
+  id                String        @id @default(uuid())
+  settingKey        String        @unique
+  settingValue      String
+  settingType       String        // e.g., "string", "number", "boolean", "json"
+  description       String?
+  isPublic          Boolean       @default(false)  // Whether this setting can be exposed to frontend
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  
+  @@index([settingKey])
+}
+
+// Feedback model for collecting user feedback
+model Feedback {
+  id                String        @id @default(uuid())
+  userId            String?
+  user              User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  feedbackType      String        // e.g., "bug", "feature_request", "general"
+  content           String        @db.Text
+  rating            Int?          // Optional rating (e.g., 1-5)
+  status            String        @default("pending") // e.g., "pending", "reviewed", "implemented"
+  adminResponse     String?       @db.Text
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  
+  @@index([userId])
+  @@index([feedbackType])
+  @@index([status])
+}

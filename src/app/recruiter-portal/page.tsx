@@ -2,8 +2,8 @@
 "use client";
 
 import React, { useState, useCallback, useRef } from 'react';
-import { AuthGuard } from '@/components/auth-guard'; 
-import { UploadCloud, FileText as FileTextIcon, Edit3, CheckCircle, XCircle, BookOpen, Target, Sparkles, ShieldAlert, Info, Download, Brain, MessageSquareMore, FileSignature } from 'lucide-react';
+import { AuthGuard } from '@/components/auth-guard';
+import { UploadCloud, FileText as FileTextIcon, Edit3, CheckCircle, XCircle, BookOpen, Target, Sparkles, ShieldAlert, Info, Download, Brain, MessageSquareMore, FileSignature, BarChart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -19,6 +19,10 @@ import { downloadHtml } from '@/lib/download-utils'; // For HTML download
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import Link from 'next/link';
+// LiveCareer API imports
+import { parseResumeWithLiveCareer, matchResumeToJobWithLiveCareer } from '@/api/livecareer-api';
+import { convertToResumeAnalysis, convertToJobMatch } from '@/api/livecareer-adapter';
 
 const acceptedFileTypes: Record<string, string[]> = {
   'application/pdf': ['.pdf'],
@@ -63,7 +67,7 @@ function RecruiterPortalContent() {
       if (file.size > 5 * 1024 * 1024) { // 5MB limit
         toast({
           title: "File Too Large",
-          description: `Please upload a file smaller than 5MB. Your file is ${(file.size / (1024*1024)).toFixed(2)}MB.`,
+          description: `Please upload a file smaller than 5MB. Your file is ${(file.size / (1024 * 1024)).toFixed(2)}MB.`,
           variant: "destructive",
         });
         setResumeFile(null);
@@ -95,8 +99,10 @@ function RecruiterPortalContent() {
   const onBrowseClick = () => resumeInputRef.current?.click();
   const removeFile = useCallback(() => {
     setResumeFile(null);
-    if(resumeInputRef.current) resumeInputRef.current.value = "";
+    if (resumeInputRef.current) resumeInputRef.current.value = "";
   }, []);
+
+  const [useLiveCareerApi, setUseLiveCareerApi] = useState<boolean>(true);
 
   const handleSubmit = async () => {
     if (!resumeFile || !jobDescription.trim()) {
@@ -115,23 +121,44 @@ function RecruiterPortalContent() {
     setResumeAnalysisForPdf(null);
 
     try {
-      const resumeDataUri = await fileToDataUri(resumeFile);
-      
-      // Run resume analysis for feedback PDF context
-      const analysis = await analyzeResume({ resumeDataUri });
-      setResumeAnalysisForPdf(analysis);
+      if (useLiveCareerApi) {
+        // Use LiveCareer API for resume parsing and job matching
+        try {
+          // Step 1: Parse the resume with LiveCareer API
+          const parsedResume = await parseResumeWithLiveCareer(resumeFile);
 
-      const input: RecruiterMatchInput = {
-        resumeDataUri,
-        jobDescriptionText: jobDescription,
-      };
-      const result = await matchResumeToJd(input);
-      setMatchResult(result);
-      toast({
-        title: "Evaluation Complete",
-        description: `Resume matched against JD with a score of ${result.fitmentScore}.`,
-        variant: "default",
-      });
+          // Step 2: Convert the parsed resume to our application format
+          const analysis = convertToResumeAnalysis(parsedResume);
+          setResumeAnalysisForPdf(analysis);
+
+          // Step 3: Match the resume to the job description with LiveCareer API
+          const jobMatchResult = await matchResumeToJobWithLiveCareer(parsedResume.id, jobDescription);
+
+          // Step 4: Convert the job match result to our application format
+          const result = convertToJobMatch(jobMatchResult, analysis);
+          setMatchResult(result);
+
+          toast({
+            title: "LiveCareer Evaluation Complete",
+            description: `Resume matched against JD with a score of ${result.fitmentScore}.`,
+            variant: "default",
+          });
+        } catch (apiError) {
+          console.error("LiveCareer API error:", apiError);
+
+          // Fallback to local AI processing if LiveCareer API fails
+          toast({
+            title: "LiveCareer API Failed",
+            description: "Falling back to local AI processing...",
+            variant: "destructive",
+          });
+
+          await processWithLocalAI();
+        }
+      } else {
+        // Use local AI processing
+        await processWithLocalAI();
+      }
     } catch (err) {
       console.error("Error matching resume to JD:", err);
       setError(err instanceof Error ? err.message : "An unknown error occurred during evaluation.");
@@ -145,9 +172,30 @@ function RecruiterPortalContent() {
     }
   };
 
+  // Helper function to process with local AI
+  const processWithLocalAI = async () => {
+    const resumeDataUri = await fileToDataUri(resumeFile!);
+
+    // Run resume analysis for feedback PDF context
+    const analysis = await analyzeResume({ resumeDataUri });
+    setResumeAnalysisForPdf(analysis);
+
+    const input: RecruiterMatchInput = {
+      resumeDataUri,
+      jobDescriptionText: jobDescription,
+    };
+    const result = await matchResumeToJd(input);
+    setMatchResult(result);
+    toast({
+      title: "Local AI Evaluation Complete",
+      description: `Resume matched against JD with a score of ${result.fitmentScore}.`,
+      variant: "default",
+    });
+  };
+
   const handleDownloadFeedback = async () => {
     if (!matchResult || !resumeAnalysisForPdf) {
-      toast({ title: "Error", description: "Match result or resume analysis not available for feedback generation.", variant: "destructive"});
+      toast({ title: "Error", description: "Match result or resume analysis not available for feedback generation.", variant: "destructive" });
       return;
     }
     setIsGeneratingFeedback(true);
@@ -176,10 +224,10 @@ function RecruiterPortalContent() {
     if (score >= 50) return 'text-yellow-500 dark:text-yellow-400';
     return 'text-red-500 dark:text-red-400';
   };
-  
+
   const getAssessmentBadgeVariant = (assessment: string): "default" | "secondary" | "destructive" | "outline" => {
     const lowerAssessment = assessment.toLowerCase();
-    if (lowerAssessment.includes("excellent") || lowerAssessment.includes("strong")) return "default"; 
+    if (lowerAssessment.includes("excellent") || lowerAssessment.includes("strong")) return "default";
     if (lowerAssessment.includes("good") || lowerAssessment.includes("fair")) return "secondary";
     return "destructive";
   };
@@ -198,17 +246,50 @@ function RecruiterPortalContent() {
             <p className="mt-4 text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto">
               Efficiently evaluate candidate resumes against job descriptions using AI-powered analysis.
             </p>
+            <div className="mt-6 flex flex-col sm:flex-row gap-4 justify-center">
+              <Link href="/recruiter-portal/enhanced">
+                <Button variant="outline" size="lg" className="group">
+                  <BarChart className="mr-2 h-5 w-5 text-primary group-hover:animate-pulse" />
+                  Enhanced Recruiter Portal
+                  <span className="ml-2 bg-primary/10 text-primary text-xs px-2 py-0.5 rounded-full">New</span>
+                </Button>
+              </Link>
+
+              <div className="flex items-center gap-2 bg-primary/5 px-4 py-2 rounded-full">
+                <span className={`text-sm ${useLiveCareerApi ? 'text-muted-foreground' : 'text-primary font-medium'}`}>Local AI</span>
+                <button
+                  onClick={() => setUseLiveCareerApi(!useLiveCareerApi)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${useLiveCareerApi ? 'bg-primary' : 'bg-input'}`}
+                >
+                  <span className={`inline-block h-5 w-5 rounded-full bg-background transition-transform ${useLiveCareerApi ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+                <span className={`text-sm ${useLiveCareerApi ? 'text-primary font-medium' : 'text-muted-foreground'}`}>LiveCareer API</span>
+              </div>
+            </div>
           </div>
         </header>
+
+        {useLiveCareerApi && (
+          <Alert className="mb-6 bg-primary/5 border-primary/20">
+            <Info className="h-5 w-5 text-primary" />
+            <AlertTitle>LiveCareer API Integration</AlertTitle>
+            <AlertDescription>
+              You are currently using the LiveCareer API for resume parsing and job matching.
+              {!process.env.NEXT_PUBLIC_LIVECAREER_API_KEY && (
+                <span className="text-destructive"> Please set your API key in the .env.local file.</span>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
           <Card className="shadow-xl bg-card/80 backdrop-blur-sm border border-primary/10 hover:border-primary/30 transition-all">
             <CardHeader>
-              <CardTitle className="flex items-center text-2xl text-primary"><UploadCloud className="mr-3 h-7 w-7"/> Upload Candidate Resume</CardTitle>
+              <CardTitle className="flex items-center text-2xl text-primary"><UploadCloud className="mr-3 h-7 w-7" /> Upload Candidate Resume</CardTitle>
               <CardDescription className="text-md">Select a resume file (PDF, DOCX, JPG, PNG - max 5MB).</CardDescription>
             </CardHeader>
             <CardContent>
-               <div
+              <div
                 className={cn(
                   "flex flex-col items-center justify-center w-full h-60 border-2 border-dashed rounded-xl cursor-pointer transition-colors duration-300 ease-in-out",
                   dragActive ? "border-primary bg-primary/10 ring-4 ring-primary/20" : "border-border hover:border-primary/70 hover:bg-accent/5",
@@ -221,8 +302,8 @@ function RecruiterPortalContent() {
                   <div className="text-center p-4">
                     <FileTextIcon className="w-16 h-16 mb-3 text-primary mx-auto" />
                     <p className="text-md text-foreground font-semibold break-all px-2">{resumeFile.name}</p>
-                    <p className="text-sm text-muted-foreground">({(resumeFile.size / (1024*1024)).toFixed(2)} MB)</p>
-                    <Button variant="ghost" size="sm" onClick={(e) => {e.stopPropagation(); removeFile();}} className="mt-3 text-destructive hover:text-destructive-foreground hover:bg-destructive/80 text-sm">
+                    <p className="text-sm text-muted-foreground">({(resumeFile.size / (1024 * 1024)).toFixed(2)} MB)</p>
+                    <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); removeFile(); }} className="mt-3 text-destructive hover:text-destructive-foreground hover:bg-destructive/80 text-sm">
                       <XCircle className="mr-1.5 h-4 w-4" /> Remove File
                     </Button>
                   </div>
@@ -250,7 +331,7 @@ function RecruiterPortalContent() {
           <Card className="shadow-xl bg-card/80 backdrop-blur-sm border border-primary/10 hover:border-primary/30 transition-all">
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle className="flex items-center text-2xl text-primary"><Edit3 className="mr-3 h-7 w-7"/> Job Description</CardTitle>
+                <CardTitle className="flex items-center text-2xl text-primary"><Edit3 className="mr-3 h-7 w-7" /> Job Description</CardTitle>
                 <Select onValueChange={(value) => setJobDescription(value)} disabled={isLoading}>
                   <SelectTrigger className="w-[200px] text-xs">
                     <SelectValue placeholder="Use Template..." />
@@ -287,7 +368,7 @@ function RecruiterPortalContent() {
 
         {error && (
           <Alert variant="destructive" className="mt-10 shadow-lg">
-            <ShieldAlert className="h-5 w-5"/>
+            <ShieldAlert className="h-5 w-5" />
             <AlertTitle className="font-semibold text-lg">Evaluation Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
@@ -296,13 +377,13 @@ function RecruiterPortalContent() {
         {matchResult && !isLoading && (
           <Card className="mt-12 shadow-2xl border-t-4 border-primary bg-card/90 backdrop-blur-lg">
             <CardHeader className="text-center pt-8 pb-6">
-                <div className="inline-block p-4 bg-primary/10 rounded-full mx-auto mb-4 ring-4 ring-primary/20">
-                    <Sparkles className={cn("w-12 h-12", getScoreColorClass(matchResult.fitmentScore))} />
-                </div>
+              <div className="inline-block p-4 bg-primary/10 rounded-full mx-auto mb-4 ring-4 ring-primary/20">
+                <Sparkles className={cn("w-12 h-12", getScoreColorClass(matchResult.fitmentScore))} />
+              </div>
               <CardTitle className="text-4xl font-bold">Candidate Fitment Report</CardTitle>
               <div className="flex justify-center mt-4">
                 <Button onClick={handleDownloadFeedback} variant="outline" size="sm" disabled={isGeneratingFeedback}>
-                  {isGeneratingFeedback ? <LoadingIndicator size="xs" text="Generating..." /> : <><Download className="mr-2 h-4 w-4" />Download Feedback Report</>}
+                  {isGeneratingFeedback ? <LoadingIndicator size="sm" text="Generating..." /> : <><Download className="mr-2 h-4 w-4" />Download Feedback Report</>}
                 </Button>
               </div>
             </CardHeader>
@@ -319,33 +400,33 @@ function RecruiterPortalContent() {
               </div>
 
               <Card className="bg-secondary/20 border-border/50 shadow-inner">
-                <CardHeader><CardTitle className="text-xl text-primary flex items-center"><MessageSquareMore className="mr-2 h-5 w-5"/>AI Reasoning</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-xl text-primary flex items-center"><MessageSquareMore className="mr-2 h-5 w-5" />AI Reasoning</CardTitle></CardHeader>
                 <CardContent><p className="text-md text-foreground/90 leading-relaxed">{matchResult.reasoning}</p></CardContent>
               </Card>
-              
+
               {matchResult.jdSkillsAnalysis && (
                 <Card className="bg-blue-500/5 border-blue-500/30 shadow-md">
-                    <CardHeader><CardTitle className="text-lg flex items-center text-blue-700 dark:text-blue-300"><Brain className="mr-2.5 h-6 w-6"/>Detailed Skills Breakdown</CardTitle></CardHeader>
-                    <CardContent className="text-sm space-y-2">
-                        <p><strong>Identified Skills in JD:</strong> {matchResult.jdSkillsAnalysis.identifiedSkillsInJd.join(', ') || 'N/A'}</p>
-                        <p className="text-green-600"><strong>Mandatory Skills Met:</strong> {matchResult.jdSkillsAnalysis.mandatorySkillsMet.join(', ') || 'None'}</p>
-                        <p className="text-green-500"><strong>Optional Skills Met:</strong> {matchResult.jdSkillsAnalysis.optionalSkillsMet.join(', ') || 'None'}</p>
-                        <p className="text-red-600"><strong>Missing Mandatory Skills:</strong> {matchResult.jdSkillsAnalysis.missingMandatorySkills.join(', ') || 'None'}</p>
-                        {matchResult.jdSkillsAnalysis.missingOptionalSkills && matchResult.jdSkillsAnalysis.missingOptionalSkills.length > 0 &&
-                            <p className="text-amber-600"><strong>Missing Optional Skills:</strong> {matchResult.jdSkillsAnalysis.missingOptionalSkills.join(', ') || 'None'}</p>
-                        }
-                        <p><strong>Additional Skills in Resume (Not in JD):</strong> {matchResult.jdSkillsAnalysis.additionalSkillsInResume.join(', ') || 'None'}</p>
-                        <AlertDescription className="text-xs mt-2">
-                            Counts: {matchResult.jdSkillsAnalysis.mandatorySkillsMet.length + matchResult.jdSkillsAnalysis.optionalSkillsMet.length} / {matchResult.jdSkillsAnalysis.identifiedSkillsInJd.length} JD skills matched.
-                        </AlertDescription>
-                    </CardContent>
+                  <CardHeader><CardTitle className="text-lg flex items-center text-blue-700 dark:text-blue-300"><Brain className="mr-2.5 h-6 w-6" />Detailed Skills Breakdown</CardTitle></CardHeader>
+                  <CardContent className="text-sm space-y-2">
+                    <p><strong>Identified Skills in JD:</strong> {matchResult.jdSkillsAnalysis.identifiedSkillsInJd.join(', ') || 'N/A'}</p>
+                    <p className="text-green-600"><strong>Mandatory Skills Met:</strong> {matchResult.jdSkillsAnalysis.mandatorySkillsMet.join(', ') || 'None'}</p>
+                    <p className="text-green-500"><strong>Optional Skills Met:</strong> {matchResult.jdSkillsAnalysis.optionalSkillsMet.join(', ') || 'None'}</p>
+                    <p className="text-red-600"><strong>Missing Mandatory Skills:</strong> {matchResult.jdSkillsAnalysis.missingMandatorySkills.join(', ') || 'None'}</p>
+                    {matchResult.jdSkillsAnalysis.missingOptionalSkills && matchResult.jdSkillsAnalysis.missingOptionalSkills.length > 0 &&
+                      <p className="text-amber-600"><strong>Missing Optional Skills:</strong> {matchResult.jdSkillsAnalysis.missingOptionalSkills.join(', ') || 'None'}</p>
+                    }
+                    <p><strong>Additional Skills in Resume (Not in JD):</strong> {matchResult.jdSkillsAnalysis.additionalSkillsInResume.join(', ') || 'None'}</p>
+                    <AlertDescription className="text-xs mt-2">
+                      Counts: {matchResult.jdSkillsAnalysis.mandatorySkillsMet.length + matchResult.jdSkillsAnalysis.optionalSkillsMet.length} / {matchResult.jdSkillsAnalysis.identifiedSkillsInJd.length} JD skills matched.
+                    </AlertDescription>
+                  </CardContent>
                 </Card>
               )}
 
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card className="bg-green-500/5 border-green-500/30 shadow-md">
-                  <CardHeader><CardTitle className="text-lg flex items-center text-green-600 dark:text-green-400"><CheckCircle className="mr-2.5 h-6 w-6"/>Key Strengths & Matches</CardTitle></CardHeader>
+                  <CardHeader><CardTitle className="text-lg flex items-center text-green-600 dark:text-green-400"><CheckCircle className="mr-2.5 h-6 w-6" />Key Strengths & Matches</CardTitle></CardHeader>
                   <CardContent>
                     {matchResult.keyMatches && matchResult.keyMatches.length > 0 ? (
                       <ul className="list-disc list-inside space-y-1.5 text-sm text-foreground/90">
@@ -355,7 +436,7 @@ function RecruiterPortalContent() {
                   </CardContent>
                 </Card>
                 <Card className="bg-red-500/5 border-red-500/30 shadow-md">
-                  <CardHeader><CardTitle className="text-lg flex items-center text-red-600 dark:text-red-400"><XCircle className="mr-2.5 h-6 w-6"/>Skill Gaps & Mismatches</CardTitle></CardHeader>
+                  <CardHeader><CardTitle className="text-lg flex items-center text-red-600 dark:text-red-400"><XCircle className="mr-2.5 h-6 w-6" />Skill Gaps & Mismatches</CardTitle></CardHeader>
                   <CardContent>
                     {matchResult.keyMismatches && matchResult.keyMismatches.length > 0 ? (
                       <ul className="list-disc list-inside space-y-1.5 text-sm text-foreground/90">
@@ -368,14 +449,14 @@ function RecruiterPortalContent() {
 
               {matchResult.courseRecommendations && matchResult.courseRecommendations.length > 0 && (
                 <Card className="bg-accent/5 border-accent/30 shadow-md">
-                  <CardHeader><CardTitle className="text-xl flex items-center text-accent"><BookOpen className="mr-2.5 h-6 w-6"/>Suggested Learning for Candidate</CardTitle></CardHeader>
+                  <CardHeader><CardTitle className="text-xl flex items-center text-accent"><BookOpen className="mr-2.5 h-6 w-6" />Suggested Learning for Candidate</CardTitle></CardHeader>
                   <CardContent className="space-y-4">
                     <p className="text-sm text-muted-foreground">To bridge identified skill gaps, consider suggesting the following learning paths to the candidate:</p>
                     {matchResult.courseRecommendations.map((course, index) => (
                       <div key={index} className="p-4 border border-border/50 rounded-lg bg-card shadow-sm">
                         <h4 className="font-semibold text-lg text-primary">{course.title}</h4>
                         <p className="text-xs text-muted-foreground mb-1">
-                          Platform: <span className="font-medium">{course.platform}</span> 
+                          Platform: <span className="font-medium">{course.platform}</span>
                           {course.focusArea && <> | Focus: <span className="font-medium">{course.focusArea}</span></>}
                         </p>
                         <p className="text-sm mt-1 text-foreground/90">{course.description}</p>
@@ -389,19 +470,19 @@ function RecruiterPortalContent() {
                 <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 <AlertTitle className="font-semibold text-blue-800 dark:text-blue-200">Disclaimer</AlertTitle>
                 <AlertDescription className="text-sm">
-                    This AI-generated report provides an initial assessment. Always conduct thorough interviews and further evaluations to make final hiring decisions.
+                  This AI-generated report provides an initial assessment. Always conduct thorough interviews and further evaluations to make final hiring decisions.
                 </AlertDescription>
-            </Alert>
+              </Alert>
             </CardContent>
           </Card>
         )}
         <footer className="text-center mt-20 py-10 border-t border-border/50">
-            <p className="text-sm text-muted-foreground">
-                &copy; {new Date().getFullYear()} ResumeAce Recruiter Suite.
-            </p>
-             <p className="text-xs text-muted-foreground/80 mt-2">
-                AI insights for informed hiring.
-            </p>
+          <p className="text-sm text-muted-foreground">
+            &copy; {new Date().getFullYear()} ResumeAce Recruiter Suite.
+          </p>
+          <p className="text-xs text-muted-foreground/80 mt-2">
+            AI insights for informed hiring.
+          </p>
         </footer>
       </div>
     </div>

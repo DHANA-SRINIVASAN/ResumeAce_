@@ -42,20 +42,20 @@ export function ResumeUploadForm({ onAnalyze, isProcessing }: ResumeUploadFormPr
         setSelectedFile(null);
         setShowImageNote(false);
         if (inputRef.current) {
-            inputRef.current.value = ""; 
+          inputRef.current.value = "";
         }
         return;
       }
       if (file.size > 5 * 1024 * 1024) { // 5MB limit
         toast({
           title: "File Too Large",
-          description: `Please upload a file smaller than 5MB. Your file is ${(file.size / (1024*1024)).toFixed(2)}MB.`,
+          description: `Please upload a file smaller than 5MB. Your file is ${(file.size / (1024 * 1024)).toFixed(2)}MB.`,
           variant: "destructive",
         });
         setSelectedFile(null);
         setShowImageNote(false);
         if (inputRef.current) {
-            inputRef.current.value = "";
+          inputRef.current.value = "";
         }
         return;
       }
@@ -67,7 +67,7 @@ export function ResumeUploadForm({ onAnalyze, isProcessing }: ResumeUploadFormPr
     }
   }, [toast]);
 
-  const handleDrag = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrag = useCallback((e: React.DragEvent<HTMLLabelElement>) => {
     e.preventDefault();
     e.stopPropagation();
     if (e.type === "dragenter" || e.type === "dragover") {
@@ -77,7 +77,7 @@ export function ResumeUploadForm({ onAnalyze, isProcessing }: ResumeUploadFormPr
     }
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = useCallback((e: React.DragEvent<HTMLLabelElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
@@ -107,8 +107,8 @@ export function ResumeUploadForm({ onAnalyze, isProcessing }: ResumeUploadFormPr
   const removeFile = useCallback(() => {
     setSelectedFile(null);
     setShowImageNote(false);
-    if(inputRef.current) {
-      inputRef.current.value = ""; 
+    if (inputRef.current) {
+      inputRef.current.value = "";
     }
   }, []);
 
@@ -126,7 +126,7 @@ export function ResumeUploadForm({ onAnalyze, isProcessing }: ResumeUploadFormPr
           onDragLeave={handleDrag}
           onDragOver={handleDrag}
           onDrop={handleDrop}
-          onClick={selectedFile ? undefined : onBrowseClick} 
+          onClick={selectedFile ? undefined : onBrowseClick}
         >
           <div className="flex flex-col items-center justify-center pt-5 pb-6">
             {selectedFile ? (
@@ -134,7 +134,7 @@ export function ResumeUploadForm({ onAnalyze, isProcessing }: ResumeUploadFormPr
                 {selectedFile.type.startsWith('image/') ? <ImageIcon className="w-12 h-12 mb-3 text-primary" /> : <FileText className="w-12 h-12 mb-3 text-primary" />}
                 <p className="mb-2 text-sm text-foreground font-semibold break-all px-2">{selectedFile.name}</p>
                 <p className="text-xs text-muted-foreground">({(selectedFile.size / 1024).toFixed(2)} KB)</p>
-                 <Button variant="ghost" size="sm" onClick={(e) => {e.stopPropagation(); removeFile();}} className="mt-2 text-destructive hover:text-destructive/80">
+                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); removeFile(); }} className="mt-2 text-destructive hover:text-destructive/80">
                   <XCircle className="mr-2 h-4 w-4" /> Remove
                 </Button>
               </>
@@ -159,7 +159,7 @@ export function ResumeUploadForm({ onAnalyze, isProcessing }: ResumeUploadFormPr
           />
         </label>
       </div>
-      
+
       {showImageNote && (
         <Alert variant="default" className="mt-4 bg-primary/5 border-primary/20">
           <ImageIcon className="h-4 w-4 text-primary" />

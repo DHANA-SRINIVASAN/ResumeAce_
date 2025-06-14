@@ -1,0 +1,730 @@
+// src/app/recruiter-portal/enhanced/page.tsx
+"use client";
+
+import React, { useState, useCallback } from 'react';
+import Link from 'next/link';
+import { AuthGuard } from '@/components/auth-guard';
+import {
+  UploadCloud,
+  FileText,
+  Search,
+  BarChart,
+  Users,
+  Briefcase,
+  AlertCircle,
+  CheckCircle,
+  Info
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useToast } from '@/hooks/use-toast';
+import { BulkResumeUpload } from '@/components/bulk-resume-upload';
+import { JobDescriptionUpload } from '@/components/job-description-upload';
+import { ResumeRankingDashboard } from '@/components/resume-ranking-dashboard';
+import { LoadingIndicator } from '@/components/loading-indicator';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { fileToDataUri } from '@/lib/file-utils';
+// LiveCareer API imports
+import { 
+  searchLiveCareerResumes as searchLiveCareerApi, 
+  getLiveCareerResumeDetails,
+  LiveCareerResumeSearchResult 
+} from '@/api/livecareer-api';
+import { convertToResumeAnalysis } from '@/api/livecareer-adapter';
+
+// Job description templates
+const jdTemplates = [
+  { label: "Software Engineer (General)", value: "We are seeking a motivated Software Engineer to design, develop, and maintain high-quality software solutions. Responsibilities include coding, testing, debugging, and collaborating with cross-functional teams. Proficiency in one or more programming languages (e.g., Java, Python, C++), understanding of data structures and algorithms, and experience with version control systems (e.g., Git) are required. Strong problem-solving skills and a bachelor's degree in Computer Science or a related field are essential. Experience with cloud platforms (AWS, Azure, GCP) and agile methodologies is a plus." },
+  { label: "Data Analyst", value: "We are looking for a Data Analyst to interpret data, analyze results using statistical techniques, and provide ongoing reports. You will develop and implement databases, data collection systems, data analytics, and other strategies that optimize statistical efficiency and quality. Strong analytical skills with the ability to collect, organize, analyze, and disseminate significant amounts of information with attention to detail and accuracy are crucial. Proficiency in SQL, Excel, and data visualization tools (e.g., Tableau, Power BI) is required. Experience with Python or R for data analysis is highly desirable." },
+  { label: "Frontend Developer", value: "Seeking a Frontend Developer to create user-friendly web pages and interfaces. You will be responsible for translating UI/UX design wireframes into actual code that will produce visual elements of the application. Proficiency in HTML, CSS, JavaScript, and modern frontend frameworks (e.g., React, Angular, Vue.js) is essential. Experience with responsive design, cross-browser compatibility, and version control (Git) is required. Familiarity with RESTful APIs and build tools like Webpack or Parcel is a plus." },
+  { label: "Marketing Specialist", value: "Join our team as a Marketing Specialist to develop and implement marketing strategies that strengthen our company's market presence and help it find a 'voice' that will make a difference. You will conduct market research, manage digital campaigns (SEO/SEM, email, social media), create compelling content, and analyze campaign performance. Strong communication, creativity, and analytical skills are essential. Experience with marketing automation tools, CRM software, and Google Analytics is preferred." },
+];
+
+// Mock function to simulate uploading resumes to the server
+const uploadResumes = async (files: File[], userId: string) => {
+  // In a real implementation, you would use FormData to upload the files
+  const formData = new FormData();
+  formData.append('userId', userId);
+
+  files.forEach(file => {
+    formData.append('files', file);
+  });
+
+  // Simulate API call
+  // const response = await fetch('/api/resumes/bulk', {
+  //   method: 'POST',
+  //   body: formData,
+  // });
+
+  // return response.json();
+
+  // For now, return mock data
+  await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate network delay
+
+  return {
+    success: true,
+    message: `Processed ${files.length} resumes successfully`,
+    results: files.map((file, index) => ({
+      id: `resume-${index}-${Date.now()}`,
+      title: file.name.replace(/\.[^/.]+$/, ""), // Remove file extension
+      createdAt: new Date().toISOString(),
+    })),
+    errors: [],
+  };
+};
+
+// Function to search LiveCareer resumes - using the API directly
+const searchLiveCareerResumes = async (query: string): Promise<LiveCareerResumeSearchResult[]> => {
+  // The API now handles errors and fallbacks internally
+  return await searchLiveCareerApi(query, 20); // Limit to 20 results
+};
+
+// Function to import a LiveCareer resume
+const importLiveCareerResume = async (resumeId: string, userId: string) => {
+  try {
+    // Get detailed resume information from LiveCareer API
+    const resumeDetails = await getLiveCareerResumeDetails(resumeId);
+    
+    // Convert to our application's format
+    const resumeAnalysis = convertToResumeAnalysis(resumeDetails);
+    
+    // In a real implementation, you would store this in your database
+    // For example:
+    // const response = await fetch('/api/resumes/import', {
+    //   method: 'POST',
+    //   headers: {
+    //     'Content-Type': 'application/json',
+    //   },
+    //   body: JSON.stringify({ 
+    //     resumeId, 
+    //     userId,
+    //     resumeDetails,
+    //     resumeAnalysis 
+    //   }),
+    // });
+    // return response.json();
+    
+    // For now, return formatted data
+    return {
+      success: true,
+      message: 'Resume imported from LiveCareer successfully',
+      resume: {
+        id: `imported-${resumeId}-${Date.now()}`,
+        title: `${resumeDetails.name || 'Imported Resume'} (${new Date().toLocaleDateString()})`,
+        createdAt: new Date().toISOString(),
+        // Store the full resume data that we can use later
+        data: resumeDetails,
+        analysis: resumeAnalysis
+      },
+    };
+  } catch (error) {
+    console.error('Error importing LiveCareer resume:', error);
+    
+    // Return error response
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Failed to import resume from LiveCareer',
+      resume: null,
+    };
+  }
+};
+
+// Mock function to simulate batch matching resumes to a job description
+const batchMatchResumes = async (resumeIds: string[], jobDescription: string, userId: string) => {
+  // In a real implementation, you would call your API
+  // const response = await fetch('/api/job-matches/batch', {
+  //   method: 'POST',
+  //   headers: {
+  //     'Content-Type': 'application/json',
+  //   },
+  //   body: JSON.stringify({ resumeIds, jobDescription, userId }),
+  // });
+
+  // return response.json();
+
+  // For now, return mock data
+  await new Promise(resolve => setTimeout(resolve, 3000)); // Simulate network delay
+
+  // Generate random match results
+  const results = resumeIds.map(resumeId => {
+    const score = Math.floor(Math.random() * 51) + 50; // Random score between 50-100
+    let assessment;
+    if (score >= 80) assessment = 'Excellent Fit';
+    else if (score >= 70) assessment = 'Good Fit';
+    else if (score >= 60) assessment = 'Fair Match';
+    else assessment = 'Needs Improvement';
+
+    return {
+      resumeId,
+      resumeTitle: `Resume ${resumeId.substring(0, 5)}`,
+      matchId: `match-${resumeId}-${Date.now()}`,
+      matchScore: score,
+      assessment,
+      keyMatches: [
+        'Strong technical skills',
+        'Relevant industry experience',
+        'Project management background',
+        'Communication skills',
+      ].slice(0, Math.floor(Math.random() * 3) + 2), // Random 2-4 matches
+      keyMismatches: [
+        'Limited leadership experience',
+        'Missing required certification',
+        'Insufficient years of experience',
+        'Lack of specific technology knowledge',
+      ].slice(0, Math.floor(Math.random() * 3) + 1), // Random 1-3 mismatches
+      candidateName: `Candidate ${resumeId.substring(0, 3)}`,
+    };
+  });
+
+  // Sort by score descending
+  results.sort((a, b) => b.matchScore - a.matchScore);
+
+  return {
+    success: true,
+    message: `Processed ${resumeIds.length} resumes against job description`,
+    results,
+    errors: [],
+  };
+};
+
+function EnhancedRecruiterPortalContent() {
+  const [activeTab, setActiveTab] = useState('upload');
+  const [uploadedResumes, setUploadedResumes] = useState<Array<{ id: string; title: string }>>([]);
+  const [liveCareerResumes, setLiveCareerResumes] = useState<any[]>([]);
+  const [selectedResumes, setSelectedResumes] = useState<string[]>([]);
+  const [jobDescription, setJobDescription] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [matchResults, setMatchResults] = useState<any[]>([]);
+
+  const [isUploadingResumes, setIsUploadingResumes] = useState(false);
+  const [isSearchingLiveCareer, setIsSearchingLiveCareer] = useState(false);
+  const [isImportingResume, setIsImportingResume] = useState(false);
+  const [isMatchingResumes, setIsMatchingResumes] = useState(false);
+
+  const { toast } = useToast();
+
+  // Mock user ID for demonstration
+  const userId = 'user-123';
+
+  const handleResumeUpload = useCallback(async (files: File[]) => {
+    try {
+      setIsUploadingResumes(true);
+      const result = await uploadResumes(files, userId);
+
+      if (result.success) {
+        setUploadedResumes(prev => [...prev, ...result.results]);
+        toast({
+          title: 'Resumes Uploaded',
+          description: result.message,
+        });
+      } else {
+        toast({
+          title: 'Upload Failed',
+          description: result.message || 'Failed to upload resumes',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error uploading resumes:', error);
+      toast({
+        title: 'Upload Error',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploadingResumes(false);
+    }
+  }, [toast, userId]);
+
+  const handleLiveCareerSearch = useCallback(async () => {
+    if (!searchQuery.trim()) {
+      toast({
+        title: 'Search Query Required',
+        description: 'Please enter a search term to find resumes on LiveCareer',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setIsSearchingLiveCareer(true);
+      const results = await searchLiveCareerResumes(searchQuery);
+      setLiveCareerResumes(results);
+
+      toast({
+        title: 'Search Complete',
+        description: `Found ${results.length} resumes on LiveCareer`,
+      });
+    } catch (error) {
+      console.error('Error searching LiveCareer:', error);
+      toast({
+        title: 'Search Error',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSearchingLiveCareer(false);
+    }
+  }, [searchQuery, toast]);
+
+  const handleImportLiveCareerResume = useCallback(async (resumeId: string) => {
+    try {
+      setIsImportingResume(true);
+      const result = await importLiveCareerResume(resumeId, userId);
+
+      if (result.success) {
+        setUploadedResumes(prev => [...prev, result.resume]);
+        toast({
+          title: 'Resume Imported',
+          description: result.message,
+        });
+      } else {
+        toast({
+          title: 'Import Failed',
+          description: result.message || 'Failed to import resume',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error importing resume:', error);
+      toast({
+        title: 'Import Error',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsImportingResume(false);
+    }
+  }, [toast, userId]);
+
+  const handleResumeSelection = useCallback((resumeId: string, isSelected: boolean) => {
+    setSelectedResumes(prev => {
+      if (isSelected) {
+        return [...prev, resumeId];
+      } else {
+        return prev.filter(id => id !== resumeId);
+      }
+    });
+  }, []);
+
+  const handleSelectAllResumes = useCallback((isSelected: boolean) => {
+    if (isSelected) {
+      setSelectedResumes(uploadedResumes.map(resume => resume.id));
+    } else {
+      setSelectedResumes([]);
+    }
+  }, [uploadedResumes]);
+
+  const handleJobDescriptionChange = useCallback((text: string) => {
+    setJobDescription(text);
+  }, []);
+
+  const handleMatchResumes = useCallback(async () => {
+    if (selectedResumes.length === 0) {
+      toast({
+        title: 'No Resumes Selected',
+        description: 'Please select at least one resume to match against the job description',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!jobDescription.trim()) {
+      toast({
+        title: 'Job Description Required',
+        description: 'Please provide a job description to match against',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setIsMatchingResumes(true);
+      const result = await batchMatchResumes(selectedResumes, jobDescription, userId);
+
+      if (result.success) {
+        setMatchResults(result.results);
+        setActiveTab('results');
+        toast({
+          title: 'Matching Complete',
+          description: result.message,
+        });
+      } else {
+        toast({
+          title: 'Matching Failed',
+          description: result.message || 'Failed to match resumes',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error matching resumes:', error);
+      toast({
+        title: 'Matching Error',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsMatchingResumes(false);
+    }
+  }, [selectedResumes, jobDescription, toast, userId]);
+
+  const handleViewResumeDetails = useCallback((resumeId: string) => {
+    // In a real implementation, you would navigate to a resume details page
+    // or open a modal with the resume details
+    toast({
+      title: 'View Resume Details',
+      description: `Viewing details for resume ${resumeId}`,
+    });
+  }, [toast]);
+
+  const handleDownloadReport = useCallback(() => {
+    // In a real implementation, you would generate and download a report
+    toast({
+      title: 'Download Report',
+      description: 'Generating and downloading report...',
+    });
+
+    // Simulate download delay
+    setTimeout(() => {
+      toast({
+        title: 'Report Downloaded',
+        description: 'Resume ranking report has been downloaded',
+      });
+    }, 2000);
+  }, [toast]);
+
+  return (
+    <div className="container mx-auto py-8">
+      <header className="mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-primary">Enhanced Recruiter Portal</h1>
+            <p className="text-muted-foreground mt-1">
+              Advanced tools for resume management and candidate evaluation
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Link href="/recruiter-portal">
+              <Button variant="outline">
+                <FileText className="mr-2 h-4 w-4" />
+                Standard Portal
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <Tabs defaultValue="upload" value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="grid grid-cols-3 w-full max-w-md mx-auto">
+          <TabsTrigger value="upload">
+            <UploadCloud className="mr-2 h-4 w-4" />
+            Upload
+          </TabsTrigger>
+          <TabsTrigger value="search">
+            <Search className="mr-2 h-4 w-4" />
+            Search
+          </TabsTrigger>
+          <TabsTrigger value="results" disabled={matchResults.length === 0}>
+            <BarChart className="mr-2 h-4 w-4" />
+            Results
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="upload" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <UploadCloud className="mr-2 h-5 w-5 text-primary" />
+                  Resume Upload
+                </CardTitle>
+                <CardDescription>
+                  Upload candidate resumes to evaluate against job descriptions
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <BulkResumeUpload
+                  onUpload={handleResumeUpload}
+                  isUploading={isUploadingResumes}
+                  acceptedFileTypes={['.pdf', '.docx', '.doc']}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Briefcase className="mr-2 h-5 w-5 text-primary" />
+                  Job Description
+                </CardTitle>
+                <CardDescription>
+                  Enter or paste a job description to match against resumes
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <JobDescriptionUpload
+                  onChange={handleJobDescriptionChange}
+                  value={jobDescription}
+                  templates={jdTemplates}
+                />
+              </CardContent>
+            </Card>
+          </div>
+
+          {uploadedResumes.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Users className="mr-2 h-5 w-5 text-primary" />
+                  Uploaded Resumes ({uploadedResumes.length})
+                </CardTitle>
+                <CardDescription>
+                  Select resumes to match against the job description
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="select-all"
+                        className="rounded border-gray-300"
+                        checked={selectedResumes.length === uploadedResumes.length && uploadedResumes.length > 0}
+                        onChange={(e) => handleSelectAllResumes(e.target.checked)}
+                      />
+                      <label htmlFor="select-all" className="text-sm font-medium">
+                        Select All
+                      </label>
+                    </div>
+                    <Button
+                      onClick={handleMatchResumes}
+                      disabled={selectedResumes.length === 0 || !jobDescription.trim() || isMatchingResumes}
+                      className="flex items-center"
+                    >
+                      {isMatchingResumes ? (
+                        <>
+                          <LoadingIndicator className="mr-2" />
+                          Matching...
+                        </>
+                      ) : (
+                        <>
+                          <BarChart className="mr-2 h-4 w-4" />
+                          Match Selected Resumes
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {uploadedResumes.map((resume) => (
+                      <div
+                        key={resume.id}
+                        className={`border rounded-lg p-4 transition-colors ${
+                          selectedResumes.includes(resume.id)
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center">
+                            <input
+                              type="checkbox"
+                              id={`resume-${resume.id}`}
+                              checked={selectedResumes.includes(resume.id)}
+                              onChange={(e) => handleResumeSelection(resume.id, e.target.checked)}
+                              className="rounded border-gray-300 mr-3"
+                            />
+                            <div>
+                              <h3 className="font-medium truncate max-w-[200px]">{resume.title}</h3>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(resume.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => handleViewResumeDetails(resume.id)}
+                          >
+                            <FileText className="h-4 w-4" />
+                            <span className="sr-only">View</span>
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="search" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Search className="mr-2 h-5 w-5 text-primary" />
+                Search LiveCareer Resumes
+              </CardTitle>
+              <CardDescription>
+                Search for resumes in the LiveCareer database by skills, job titles, or keywords
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <Input
+                      placeholder="Enter skills, job titles, or keywords..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleLiveCareerSearch()}
+                    />
+                  </div>
+                  <Button
+                    onClick={handleLiveCareerSearch}
+                    disabled={!searchQuery.trim() || isSearchingLiveCareer}
+                  >
+                    {isSearchingLiveCareer ? (
+                      <>
+                        <LoadingIndicator className="mr-2" />
+                        Searching...
+                      </>
+                    ) : (
+                      <>
+                        <Search className="mr-2 h-4 w-4" />
+                        Search
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {isSearchingLiveCareer && (
+                  <div className="flex justify-center py-8">
+                    <LoadingIndicator size="lg" />
+                  </div>
+                )}
+
+                {!isSearchingLiveCareer && liveCareerResumes.length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">
+                      Found {liveCareerResumes.length} resumes
+                    </h3>
+                    <div className="grid grid-cols-1 gap-4">
+                      {liveCareerResumes.map((resume) => (
+                        <div
+                          key={resume.id}
+                          className="border rounded-lg p-4 hover:border-primary transition-colors"
+                        >
+                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                              <h3 className="font-medium text-lg">{resume.name}</h3>
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {resume.skills.slice(0, 5).map((skill, index) => (
+                                  <span
+                                    key={index}
+                                    className="bg-primary/10 text-primary text-xs px-2 py-1 rounded-full"
+                                  >
+                                    {skill}
+                                  </span>
+                                ))}
+                                {resume.skills.length > 5 && (
+                                  <span className="bg-muted text-muted-foreground text-xs px-2 py-1 rounded-full">
+                                    +{resume.skills.length - 5} more
+                                  </span>
+                                )}
+                              </div>
+                              <div className="mt-3 text-sm text-muted-foreground">
+                                <div>
+                                  <strong>Latest:</strong>{' '}
+                                  {resume.experience && resume.experience[0]
+                                    ? `${resume.experience[0].title} at ${resume.experience[0].company}`
+                                    : 'No experience listed'}
+                                </div>
+                                {resume.matchScore && (
+                                  <div className="mt-1">
+                                    <strong>Match Score:</strong> {resume.matchScore}%
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <Button
+                              onClick={() => handleImportLiveCareerResume(resume.id)}
+                              disabled={isImportingResume}
+                              className="whitespace-nowrap"
+                            >
+                              {isImportingResume ? (
+                                <>
+                                  <LoadingIndicator className="mr-2" />
+                                  Importing...
+                                </>
+                              ) : (
+                                <>
+                                  <FileText className="mr-2 h-4 w-4" />
+                                  Import Resume
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!isSearchingLiveCareer && searchQuery && liveCareerResumes.length === 0 && (
+                  <div className="text-center py-8">
+                    <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium">No resumes found</h3>
+                    <p className="text-muted-foreground mt-1">
+                      Try different keywords or skills to find matching resumes
+                    </p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="results" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+                <div>
+                  <CardTitle className="flex items-center">
+                    <BarChart className="mr-2 h-5 w-5 text-primary" />
+                    Resume Ranking Results
+                  </CardTitle>
+                  <CardDescription>
+                    {matchResults.length} resumes ranked by match score
+                  </CardDescription>
+                </div>
+                <Button onClick={handleDownloadReport} variant="outline">
+                  <Download className="mr-2 h-4 w-4" />
+                  Download Report
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ResumeRankingDashboard results={matchResults} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+export default function EnhancedRecruiterPortalPage() {
+  return (
+    <AuthGuard>
+      <EnhancedRecruiterPortalContent />
+    </AuthGuard>
+  );
+}

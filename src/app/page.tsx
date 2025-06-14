@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { LogIn, UserPlus, Sparkles, UserCircle, Briefcase, ArrowRight } from 'lucide-react';
+import { LogIn, UserPlus, Sparkles, UserCircle, Briefcase, ArrowRight, FileText } from 'lucide-react';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/useAuth';
 import { LoadingIndicator } from '@/components/loading-indicator';
@@ -60,7 +60,7 @@ export default function HomePortalPage() {
               </Card>
               <Card className="shadow-xl hover:shadow-2xl transition-all duration-300 ease-in-out transform hover:-translate-y-1 group bg-card/80 backdrop-blur-sm border border-primary/20 hover:border-primary/40">
                 <CardHeader className="items-center text-center pt-8">
-                   <div className="p-4 bg-primary/10 rounded-full text-primary mb-4 group-hover:scale-110 transition-transform">
+                  <div className="p-4 bg-primary/10 rounded-full text-primary mb-4 group-hover:scale-110 transition-transform">
                     <Briefcase className="w-14 h-14" />
                   </div>
                   <CardTitle className="text-2xl font-bold">Recruiter Portal</CardTitle>
@@ -77,7 +77,7 @@ export default function HomePortalPage() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <Card className="shadow-xl hover:shadow-2xl transition-all duration-300 ease-in-out transform hover:-translate-y-1 group bg-card/80 backdrop-blur-sm border-border hover:border-primary/40">
               <CardHeader className="items-center text-center pt-8">
                 <div className="p-4 bg-primary/10 rounded-full text-primary mb-4 group-hover:scale-110 transition-transform">
@@ -111,19 +111,36 @@ export default function HomePortalPage() {
                 </Button>
               </CardContent>
             </Card>
+
+            <Card className="shadow-xl hover:shadow-2xl transition-all duration-300 ease-in-out transform hover:-translate-y-1 group bg-card/80 backdrop-blur-sm border-border hover:border-primary/40">
+              <CardHeader className="items-center text-center pt-8">
+                <div className="p-4 bg-primary/10 rounded-full text-primary mb-4 group-hover:scale-110 transition-transform">
+                  <FileText className="w-12 h-12" />
+                </div>
+                <CardTitle className="text-2xl font-bold">Resume Templates</CardTitle>
+                <CardDescription className="text-md min-h-[40px]">
+                  Browse our collection of professional resume templates.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="text-center pb-8">
+                <Button asChild size="lg" variant="secondary" className="w-full md:w-3/4 group-hover:bg-primary/10 transition-colors">
+                  <Link href="/templates">View Templates <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" /></Link>
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         )}
       </div>
-      
+
       <div className="mt-12 max-w-5xl w-full text-center opacity-80 group">
-         <Image
-            src="https://picsum.photos/1200/400" // Larger image
-            alt="Abstract representation of career growth and technology"
-            width={1200}
-            height={400}
-            className="rounded-xl shadow-2xl mx-auto object-cover group-hover:scale-[1.02] transition-transform duration-500 ease-out"
-            data-ai-hint="futuristic tech"
-            priority // Preload this image as it's LCP for guests
+        <Image
+          src="https://picsum.photos/1200/400" // Larger image
+          alt="Abstract representation of career growth and technology"
+          width={1200}
+          height={400}
+          className="rounded-xl shadow-2xl mx-auto object-cover group-hover:scale-[1.02] transition-transform duration-500 ease-out"
+          data-ai-hint="futuristic tech"
+          priority // Preload this image as it's LCP for guests
         />
       </div>
 

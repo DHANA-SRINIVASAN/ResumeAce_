@@ -102,15 +102,13 @@ None explicitly highlighted.
 {{/if}}
 
 {{#if matchData.jdSkillsAnalysis}}
-  {{#with matchData.jdSkillsAnalysis}}
-    Detailed Skills Analysis:
-      Identified skills in JD: {{#if identifiedSkillsInJd.length}}{{#each identifiedSkillsInJd}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}N/A{{/if}}
-      Mandatory skills met: {{#if mandatorySkillsMet.length}}{{#each mandatorySkillsMet}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}N/A{{/if}}
-      Optional skills met: {{#if optionalSkillsMet.length}}{{#each optionalSkillsMet}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}N/A{{/if}}
-      Missing mandatory skills: {{#if missingMandatorySkills.length}}{{#each missingMandatorySkills}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}N/A{{/if}}
-      Missing optional skills: {{#if missingOptionalSkills.length}}{{#each missingOptionalSkills}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}None{{/if}}
-      Additional skills in resume (not in JD): {{#if additionalSkillsInResume.length}}{{#each additionalSkillsInResume}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}N/A{{/if}}
-  {{/with}}
+Detailed Skills Analysis:
+  Identified skills in JD: {{#if matchData.jdSkillsAnalysis.identifiedSkillsInJd.length}}{{#each matchData.jdSkillsAnalysis.identifiedSkillsInJd}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}N/A{{/if}}
+  Mandatory skills met: {{#if matchData.jdSkillsAnalysis.mandatorySkillsMet.length}}{{#each matchData.jdSkillsAnalysis.mandatorySkillsMet}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}N/A{{/if}}
+  Optional skills met: {{#if matchData.jdSkillsAnalysis.optionalSkillsMet.length}}{{#each matchData.jdSkillsAnalysis.optionalSkillsMet}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}N/A{{/if}}
+  Missing mandatory skills: {{#if matchData.jdSkillsAnalysis.missingMandatorySkills.length}}{{#each matchData.jdSkillsAnalysis.missingMandatorySkills}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}N/A{{/if}}
+  {{#if matchData.jdSkillsAnalysis.missingOptionalSkills.length}}Missing optional skills: {{#each matchData.jdSkillsAnalysis.missingOptionalSkills}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}{{#if matchData.jdSkillsAnalysis}}Missing optional skills: None{{/if}}{{/if}}
+  Additional skills in resume (not in JD): {{#if matchData.jdSkillsAnalysis.additionalSkillsInResume.length}}{{#each matchData.jdSkillsAnalysis.additionalSkillsInResume}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}N/A{{/if}}
 {{/if}}
 
 {{#if matchData.courseRecommendations.length}}

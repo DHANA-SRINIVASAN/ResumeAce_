@@ -1,0 +1,25 @@
+{
+  "skills": [
+    "JavaScript",
+    "React",
+    "Node.js"
+  ],
+  "experience": [
+    {
+      "company": "Example Company",
+      "role": "Software Developer",
+      "startDate": "2020-01-01",
+      "endDate": "2022-01-01",
+      "description": "Worked on various projects"
+    }
+  ],
+  "education": [
+    {
+      "institution": "Example University",
+      "degree": "Bachelor of Science",
+      "field": "Computer Science",
+      "startDate": "2016-01-01",
+      "endDate": "2020-01-01"
+    }
+  ]
+}

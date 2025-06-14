@@ -1,0 +1,25 @@
+{
+  "skills": [
+    "API Testing",
+    "JavaScript",
+    "Node.js"
+  ],
+  "experience": [
+    {
+      "company": "API Test Company",
+      "role": "API Tester",
+      "startDate": "2023-01-01",
+      "endDate": "2023-12-31",
+      "description": "Testing API endpoints"
+    }
+  ],
+  "education": [
+    {
+      "institution": "API University",
+      "degree": "Bachelor of API",
+      "field": "API Science",
+      "startDate": "2019-01-01",
+      "endDate": "2023-01-01"
+    }
+  ]
+}
